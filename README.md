@@ -197,13 +197,18 @@ bun test --watch   # 監聽模式（存檔自動重跑）
 
 ## 環境變數
 
-```env
-# 伺服器埠號（預設：3000）
-PORT=3000
+複製 `.env.example` 為 `.env` 後依需求調整：
 
-# 暫存檔資料夾路徑（預設：./temp）
-TEMP_FOLDER=./temp
+```bash
+cp .env.example .env
 ```
+
+| 變數          | 說明                             | 預設值   |
+| ------------- | -------------------------------- | -------- |
+| `PORT`        | 伺服器監聽埠號                   | `3000`   |
+| `TEMP_FOLDER` | 暫存提示檔目錄                   | `./temp` |
+| `LOG_LEVEL`   | `debug`、`info`、`warn`、`error` | `info`   |
+| `LOG_FORMAT`  | `text`（彩色）或 `json`          | `text`   |
 
 ---
 
@@ -218,6 +223,7 @@ src/
 ├── services/
 │   └── gemini.ts               # GeminiArgument（CLI 命令建構與暫存檔管理）
 ├── utils/
+│   ├── logger.ts               # 結構化 Logger（LOG_LEVEL / LOG_FORMAT）
 │   ├── promptBuilder.ts        # flattenMessages + buildPromptWithTools
 │   ├── sseFormatter.ts         # toSSEChunk + sendToolCallSSE
 │   └── chatStream.ts           # handleToolStream、handleTextStream、flushToolOrText 等
@@ -233,6 +239,7 @@ tests/
     ├── chatStream.test.ts
     └── promptBuilder.test.ts
 temp/                           # 暫存提示檔（自動管理）
+.env.example                    # 環境變數範本
 package.json
 tsconfig.json
 ```

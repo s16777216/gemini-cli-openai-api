@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import Implementations from './implements';
+import { config } from './config';
 
 const app = new Hono();
 
@@ -11,7 +12,7 @@ app.basePath('/v1')
     .post('/chat/completions', Implementations.ChatCompletions);
 
 export default {
-    port: 3000,
+    port: config.port,
     fetch: app.fetch,
-    idleTimeout: 120 // 120 seconds 
+    idleTimeout: config.idleTimeout
 };
