@@ -1,93 +1,11 @@
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { stream } from "hono/streaming";
-import { ChatCompletionSchema, flattenMessages, GeminiArgument, buildPromptWithTools, type Message } from "../type";
-
-const TOOL_CALL_PREFIX = 'TOOL_CALL:';
-
-/** 將文字內容包裝成 OpenAI SSE chunk 格式 */
-function toSSEChunk(content: string, model: string, finish_reason: string | null = null): string {
-    const chunk = {
-        id: `chatcmpl-${Date.now()}`,
-        object: "chat.completion.chunk",
-        created: Math.floor(Date.now() / 1000),
-        model,
-        choices: [{
-            index: 0,
-            delta: finish_reason ? {} : { content },
-            finish_reason,
-        }],
-    };
-    return `data: ${JSON.stringify(chunk)}\n\n`;
-}
-
-/** 發送 OpenAI tool_calls SSE 格式 */
-async function sendToolCallSSE(stream: any, toolCallJson: string, modelName: string) {
-    let toolCall: { name: string; arguments: any };
-    try {
-        toolCall = JSON.parse(toolCallJson.slice(TOOL_CALL_PREFIX.length).trim());
-    } catch (e) {
-        console.warn('[ToolCall] Failed to parse tool call JSON:', toolCallJson);
-        // fallback: 當成純文字回傳
-        await stream.write(toSSEChunk(toolCallJson, modelName));
-        await stream.write(toSSEChunk("", modelName, "stop"));
-        await stream.write("data: [DONE]\n\n");
-        return;
-    }
-
-    const callId = `call_${Date.now()}`;
-    const argsStr = typeof toolCall.arguments === 'string'
-        ? toolCall.arguments
-        : JSON.stringify(toolCall.arguments);
-
-    // Chunk 1: 宣告 tool call（tool name）
-    await stream.write(`data: ${JSON.stringify({
-        id: `chatcmpl-${Date.now()}`,
-        object: "chat.completion.chunk",
-        created: Math.floor(Date.now() / 1000),
-        model: modelName,
-        choices: [{
-            index: 0,
-            delta: {
-                role: "assistant",
-                content: null,
-                tool_calls: [{
-                    index: 0,
-                    id: callId,
-                    type: "function",
-                    function: { name: toolCall.name, arguments: "" }
-                }]
-            },
-            finish_reason: null
-        }]
-    })}\n\n`);
-
-    // Chunk 2: arguments
-    await stream.write(`data: ${JSON.stringify({
-        id: `chatcmpl-${Date.now()}`,
-        object: "chat.completion.chunk",
-        created: Math.floor(Date.now() / 1000),
-        model: modelName,
-        choices: [{
-            index: 0,
-            delta: {
-                tool_calls: [{ index: 0, function: { arguments: argsStr } }]
-            },
-            finish_reason: null
-        }]
-    })}\n\n`);
-
-    // Chunk 3: finish_reason = tool_calls
-    await stream.write(`data: ${JSON.stringify({
-        id: `chatcmpl-${Date.now()}`,
-        object: "chat.completion.chunk",
-        created: Math.floor(Date.now() / 1000),
-        model: modelName,
-        choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }]
-    })}\n\n`);
-
-    await stream.write("data: [DONE]\n\n");
-}
+import { ChatCompletionSchema, type Message } from "../schemas/chat";
+import { GeminiArgument } from "../services/gemini";
+import { flattenMessages, buildPromptWithTools } from "../utils/promptBuilder";
+import { toSSEChunk, sendToolCallSSE, TOOL_CALL_PREFIX } from "../utils/sseFormatter";
+import { config } from "../config";
 
 export default async function ChatCompletions(context: Context) {
     const body = await context.req.json();
@@ -99,7 +17,7 @@ export default async function ChatCompletions(context: Context) {
         throw new HTTPException(400, {
             message: "Invalid request body",
             cause: result.error
-        })
+        });
     }
 
     const { messages, stream: isStream, model, tools } = result.data as any;
@@ -107,10 +25,10 @@ export default async function ChatCompletions(context: Context) {
 
     const flatText = flattenMessages(messages as Message[]);
     const prompt = hasTools ? buildPromptWithTools(flatText, tools) : flatText;
+    const modelName = model ?? config.defaultModel;
 
     console.log(`[Request] Stream: ${isStream}, Prompt length: ${prompt.length}, Tools: ${hasTools ? tools.length : 0}`);
 
-    const modelName = model ?? "gemini";
     const geminiArg = new GeminiArgument(prompt, modelName);
     const command = await geminiArg.toCommand();
 
@@ -152,18 +70,14 @@ export default async function ChatCompletions(context: Context) {
                                 accumulatedContent += event.content;
                             } else if (event.type === 'result') {
                                 const fullContent = accumulatedContent.trim();
-
-                                // 尋找 TOOL_CALL: 標記（可能附帶前置文字）
                                 const toolCallIndex = fullContent.indexOf(TOOL_CALL_PREFIX);
+
                                 if (toolCallIndex !== -1) {
                                     const toolCallStr = fullContent.slice(toolCallIndex);
                                     console.log(`[ToolCall] Detected: ${toolCallStr.substring(0, 80)}...`);
                                     await sendToolCallSSE(stream, toolCallStr, modelName);
                                 } else {
-                                    // 純文字回應
-                                    if (fullContent) {
-                                        await stream.write(toSSEChunk(fullContent, modelName));
-                                    }
+                                    if (fullContent) await stream.write(toSSEChunk(fullContent, modelName));
                                     await stream.write(toSSEChunk("", modelName, "stop"));
                                     await stream.write("data: [DONE]\n\n");
                                 }

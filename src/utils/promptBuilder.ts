@@ -1,61 +1,4 @@
-import z from "zod";
-
-export const MessageSchema = z.object({
-    role: z.string(),
-    content: z.union([z.string(), z.array(z.any()), z.null(), z.undefined()]),
-    tool_calls: z.array(z.any()).optional(),
-    tool_call_id: z.string().optional(),
-    name: z.string().optional(),
-}).loose();
-
-export const ChatCompletionSchema = z.object({
-    model: z.string().optional(),
-    messages: z.array(MessageSchema),
-    stream: z.boolean().optional(),
-    tools: z.array(z.any()).optional(),
-    tool_choice: z.any().optional(),
-}).loose();
-
-export class GeminiArgument {
-    readonly TMP_FOLDER = Bun.env.TEMP_FOLDER || "./temp"
-
-    prompt: string;
-    model: string;
-    tempFilePath: string | null;
-
-    constructor(prompt: string, model = "gemini") {
-        this.prompt = prompt;
-        this.model = model;
-        this.tempFilePath = null;
-    }
-
-    async toCommand() {
-        const tempFilePath = await this.writeTempFile(this.prompt)
-        return ["cat", `"${tempFilePath}"`, "|", "gemini", "--model", this.model, "--output-format", "stream-json"]
-    }
-
-    private async writeTempFile(prompt: string) {
-        const tempFilePath = `${this.TMP_FOLDER}/${new Date().getTime()}`
-        await Bun.write(tempFilePath, prompt)
-        this.tempFilePath = tempFilePath
-        return tempFilePath
-    }
-
-    async cleanTempFile() {
-        if (this.tempFilePath) {
-            await Bun.file(this.tempFilePath).delete()
-            this.tempFilePath = null
-        }
-    }
-}
-
-export interface Message {
-    role: string;
-    content: string | any[] | null | undefined;
-    tool_calls?: any[];
-    tool_call_id?: string;
-    name?: string;
-}
+import type { Message } from "../schemas/chat";
 
 export function flattenMessages(messages: Message[]): string {
     return messages.map(m => {
@@ -100,11 +43,9 @@ export function flattenMessages(messages: Message[]): string {
 export function buildPromptWithTools(flatMessages: string, tools: any[]): string {
     if (!tools || tools.length === 0) return flatMessages;
 
-    // 只列出工具名稱與簡短說明，避免傳入 JSON schema 觸發 gemini CLI 的內建工具執行
     const toolDescriptions = tools.map(t => {
         const f = t.function;
         const firstLine = (f.description || '').split('\n')[0].substring(0, 120);
-        // 列出必要參數
         const required: string[] = f.parameters?.required ?? [];
         const props = f.parameters?.properties ?? {};
         const paramDesc = required.map((k: string) => {

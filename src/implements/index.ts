@@ -9,7 +9,7 @@ interface Implementations {
 
 const Implementations: Implementations = {
     ChatCompletions,
-    ModelList
-}
+    ModelList,
+};
 
 export default Implementations;

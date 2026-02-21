@@ -8,22 +8,16 @@
 
 ## 目錄
 
-- [gemini-cli-openai-api](#gemini-cli-openai-api)
-  - [目錄](#目錄)
-  - [運作原理](#運作原理)
-  - [前置需求](#前置需求)
-    - [安裝 Gemini CLI 並登入](#安裝-gemini-cli-並登入)
-  - [安裝與啟動](#安裝與啟動)
-    - [使用 Node.js（不使用 Bun）](#使用-nodejs不使用-bun)
-  - [API 端點](#api-端點)
-  - [使用範例](#使用範例)
-    - [curl（串流模式）](#curl串流模式)
-    - [設定為 OpenAI 相容端點](#設定為-openai-相容端點)
-  - [支援模型](#支援模型)
-  - [工具呼叫（Tool Calls）](#工具呼叫tool-calls)
-  - [環境變數](#環境變數)
-  - [專案結構](#專案結構)
-  - [授權](#授權)
+- [運作原理](#運作原理)
+- [前置需求](#前置需求)
+- [安裝與啟動](#安裝與啟動)
+- [API 端點](#api-端點)
+- [使用範例](#使用範例)
+- [支援模型](#支援模型)
+- [工具呼叫（Tool Calls）](#工具呼叫tool-calls)
+- [環境變數](#環境變數)
+- [專案結構](#專案結構)
+- [授權](#授權)
 
 ---
 
@@ -43,7 +37,7 @@
    Gemini CLI（本地端執行）
 ```
 
-本代理**不**直接呼叫 Gemini REST API，而是透過 `gemini` CLI 命令執行推理，因此使用 CLI 的認證機制（Google 帳號登入），無需管理 API Key。
+本代理**不**直接呼叫 Gemini REST API，而是透過 `gemini` CLI 命令執行推理，使用 CLI 的認證機制（Google 帳號登入），無需管理 API Key。
 
 ---
 
@@ -68,7 +62,6 @@ gemini  # 首次執行會引導登入
 ## 安裝與啟動
 
 ```bash
-
 # 安裝相依套件
 bun install
 # 或 npm install
@@ -86,7 +79,7 @@ bun run start
 
 ```bash
 npm run dev:node   # 開發模式（tsx watch）
-npm run build      # 編譯 TypeScript
+npm run build      # 型別檢查（tsc，noEmit）
 npm run start:node # 執行編譯後的版本
 ```
 
@@ -94,13 +87,13 @@ npm run start:node # 執行編譯後的版本
 
 ## API 端點
 
-| 方法   | 路徑                | 說明                                          |
-| ------ | ------------------- | --------------------------------------------- |
-| `GET`  | `/`                 | 健康檢查，回傳 `Gemini CLI Proxy is running!` |
-| `GET`  | `/models`           | 列出支援的模型清單（OpenAI 格式）             |
-| `POST` | `/chat/completions` | 聊天完成，相容 OpenAI Chat Completions API    |
+所有路由掛載於 `/v1` 前綴：
 
-> **注意**：目前**不**掛載 `/v1` 前綴，請直接使用上述路徑。
+| 方法   | 路徑                   | 說明                                          |
+| ------ | ---------------------- | --------------------------------------------- |
+| `GET`  | `/v1/`                 | 健康檢查，回傳 `Gemini CLI Proxy is running!` |
+| `GET`  | `/v1/models`           | 列出支援的模型清單（OpenAI 格式）             |
+| `POST` | `/v1/chat/completions` | 聊天完成，相容 OpenAI Chat Completions API    |
 
 ---
 
@@ -109,7 +102,7 @@ npm run start:node # 執行編譯後的版本
 ### curl（串流模式）
 
 ```bash
-curl -N http://localhost:3000/chat/completions \
+curl -N http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-2.5-flash",
@@ -125,16 +118,35 @@ curl -N http://localhost:3000/chat/completions \
 將任何支援自訂 OpenAI Base URL 的工具指向：
 
 ```
-http://localhost:3000
+http://localhost:3000/v1
 ```
 
 API Key 欄位填入任意字串即可（本代理不驗證 Key）。
+
+#### OpenCode (`opencode.json`) 設定範例
+
+```json
+{
+  "provider": {
+    "gemini-proxy": {
+      "options": {
+        "baseURL": "http://localhost:3000/v1"
+      },
+      "models": {
+        "gemini-2.5-flash": {
+          "name": "gemini-2.5-flash (Gemini CLI Proxy)"
+        }
+      }
+    }
+  }
+}
+```
 
 ---
 
 ## 支援模型
 
-透過 `GET /models` 可取得完整清單，目前支援：
+透過 `GET /v1/models` 可取得完整清單，目前支援：
 
 | 模型 ID                  | 說明         |
 | ------------------------ | ------------ |
@@ -155,10 +167,9 @@ API Key 欄位填入任意字串即可（本代理不驗證 Key）。
 3. 代理偵測 `TOOL_CALL:` 標記後，將其轉換為標準 OpenAI `tool_calls` SSE chunk 回傳
 
 ```
-# 工具模式流程
 請求（含 tools 定義）
   → 注入工具使用說明至提示
-  → Gemini 回應 TOOL_CALL:{...}
+  → Gemini 回應 TOOL_CALL:{...}（純文字）
   → 代理解析並轉換為 OpenAI tool_calls 格式
   → 客戶端收到標準工具呼叫事件
 ```
@@ -168,6 +179,9 @@ API Key 欄位填入任意字串即可（本代理不驗證 Key）。
 ## 環境變數
 
 ```env
+# 伺服器埠號（預設：3000）
+PORT=3000
+
 # 暫存檔資料夾路徑（預設：./temp）
 TEMP_FOLDER=./temp
 ```
@@ -177,14 +191,23 @@ TEMP_FOLDER=./temp
 ## 專案結構
 
 ```
-├── src/
-│   ├── index.ts            # 伺服器入口、路由定義
-│   ├── type.ts             # 型別定義、提示處理工具函式
-│   └── implements/
-│       └── chat.ts         # /chat/completions 核心實作
-├── temp/                   # 暫存提示檔（自動管理）
-├── package.json
-└── tsconfig.json
+src/
+├── config.ts                   # 集中設定（port、models、tempFolder）
+├── index.ts                    # 伺服器入口、路由定義
+├── schemas/
+│   └── chat.ts                 # Zod 驗證 schemas + Message interface
+├── services/
+│   └── gemini.ts               # GeminiArgument（CLI 命令建構與暫存檔管理）
+├── utils/
+│   ├── promptBuilder.ts        # flattenMessages + buildPromptWithTools
+│   └── sseFormatter.ts         # toSSEChunk + sendToolCallSSE
+└── implements/
+    ├── index.ts                # Handler 匯出集合
+    ├── chat.ts                 # POST /v1/chat/completions 核心實作
+    └── modelList.ts            # GET /v1/models
+temp/                           # 暫存提示檔（自動管理）
+package.json
+tsconfig.json
 ```
 
 ---
