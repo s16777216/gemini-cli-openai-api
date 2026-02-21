@@ -97,3 +97,30 @@ export async function flushToolOrText(
 export function splitLines(text: string): string[] {
     return text.split('\n').filter(l => l.trim() !== '');
 }
+
+/**
+ * 非串流模式：收集 gemini CLI 的完整回應文字並回傳。
+ * 不送任何 SSE，由呼叫端決定如何包裝成 JSON。
+ */
+export async function collectStreamedContent(
+    stdout: AsyncIterable<Uint8Array>
+): Promise<string> {
+    const decoder = new TextDecoder();
+    let accumulated = '';
+
+    for await (const chunk of stdout) {
+        const text = decoder.decode(chunk, { stream: true });
+        for (const line of splitLines(text)) {
+            try {
+                const event = JSON.parse(line);
+                if (event.type === 'message' && event.role === 'assistant' && event.content) {
+                    accumulated += event.content;
+                }
+            } catch {
+                console.warn(`[NonStream] Failed to parse JSON: ${line}`);
+            }
+        }
+    }
+
+    return accumulated.trim();
+}

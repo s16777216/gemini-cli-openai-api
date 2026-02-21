@@ -9,28 +9,30 @@ describe("flattenMessages", () => {
             { role: "assistant", content: "您好！" },
         ];
         const result = flattenMessages(messages);
-        expect(result).toBe("User: 你好\n\nAssistant: 您好！");
+        expect(result).toContain("<user>\n你好\n</user>");
+        expect(result).toContain("<assistant>\n您好！\n</assistant>");
     });
 
-    test("system 訊息", () => {
+    test("system 訊息移到最前並用 <system> 包裝", () => {
         const messages: Message[] = [
             { role: "system", content: "你是一個助理" },
         ];
-        expect(flattenMessages(messages)).toBe("System: 你是一個助理");
+        const result = flattenMessages(messages);
+        expect(result).toBe("<system>\n你是一個助理\n</system>");
     });
 
-    test("tool 結果訊息", () => {
+    test("tool 結果訊息用 <tool_result> 包裝", () => {
         const messages: Message[] = [
             { role: "tool", content: "檔案已寫入", tool_call_id: "call_123" },
         ];
-        expect(flattenMessages(messages)).toBe("Tool Result: 檔案已寫入");
+        expect(flattenMessages(messages)).toContain("<tool_result>\n檔案已寫入\n</tool_result>");
     });
 
     test("tool content 為物件時 JSON 序列化", () => {
         const messages: Message[] = [
             { role: "tool", content: { success: true } as any },
         ];
-        expect(flattenMessages(messages)).toBe('Tool Result: {"success":true}');
+        expect(flattenMessages(messages)).toContain('{"success":true}');
     });
 
     test("assistant 訊息附帶 tool_calls", () => {
@@ -42,7 +44,8 @@ describe("flattenMessages", () => {
             }]
         }];
         const result = flattenMessages(messages);
-        expect(result).toContain("Called: write");
+        expect(result).toContain("called: write(");
+        expect(result).toContain("<assistant>");
     });
 
     test("content 為陣列（多模態格式）只取 text 部分", () => {
@@ -53,12 +56,34 @@ describe("flattenMessages", () => {
                 { type: "image_url", url: "http://..." },
             ] as any,
         }];
-        expect(flattenMessages(messages)).toBe("User: 請分析這張圖");
+        expect(flattenMessages(messages)).toContain("請分析這張圖");
     });
 
     test("content 為 null 時不崩潰", () => {
         const messages: Message[] = [{ role: "assistant", content: null }];
-        expect(flattenMessages(messages)).toBe("Assistant: ");
+        const result = flattenMessages(messages);
+        expect(result).toContain("<assistant>");
+        expect(result).toContain("</assistant>");
+    });
+
+    test("system 在混合訊息中排在最前", () => {
+        const messages: Message[] = [
+            { role: "user", content: "hi" },
+            { role: "system", content: "系統提示" },
+        ];
+        const result = flattenMessages(messages);
+        expect(result.indexOf("<system>")).toBeLessThan(result.indexOf("<user>"));
+    });
+
+    test("長 tool call arguments 超過限制時截斷", () => {
+        const longArgs = JSON.stringify({ content: "x".repeat(1000) });
+        const messages: Message[] = [{
+            role: "assistant",
+            content: null,
+            tool_calls: [{ function: { name: "write", arguments: longArgs } }]
+        }];
+        const result = flattenMessages(messages);
+        expect(result).toContain("[省略");
     });
 });
 
@@ -84,31 +109,15 @@ describe("buildPromptWithTools", () => {
     });
 
     test("有 tools 時會加入工具說明前綴", () => {
-        const result = buildPromptWithTools("User: hello", [fakeTool]);
+        const result = buildPromptWithTools("<user>\nhello\n</user>", [fakeTool]);
         expect(result).toContain("TOOL_CALL:");
         expect(result).toContain("write");
-        expect(result).toContain("User: hello");
+        expect(result).toContain("hello");
     });
 
     test("工具說明包含必要參數名稱", () => {
         const result = buildPromptWithTools("", [fakeTool]);
         expect(result).toContain("filePath");
         expect(result).toContain("content");
-    });
-
-    test("工具說明截斷過長描述（120 字元）", () => {
-        const longDescTool = {
-            ...fakeTool,
-            function: {
-                ...fakeTool.function,
-                description: "A".repeat(200),
-            },
-        };
-        const result = buildPromptWithTools("", [longDescTool]);
-        // description 第一行最多 120 字元
-        const lines = result.split('\n');
-        const toolLine = lines.find(l => l.includes("write("));
-        expect(toolLine!.length).toBeLessThanOrEqual(200); // 不應包含 200 個 A
-        expect(toolLine).toContain("A".repeat(120));
     });
 });

@@ -4,7 +4,8 @@ import { stream } from "hono/streaming";
 import { ChatCompletionSchema, type Message } from "../schemas/chat";
 import { GeminiArgument } from "../services/gemini";
 import { flattenMessages, buildPromptWithTools } from "../utils/promptBuilder";
-import { handleToolStream, handleTextStream, pipeStderr } from "../utils/chatStream";
+import { handleToolStream, handleTextStream, pipeStderr, collectStreamedContent } from "../utils/chatStream";
+import { buildNonStreamResponse, buildToolCallNonStreamResponse, TOOL_CALL_PREFIX } from "../utils/sseFormatter";
 import { config } from "../config";
 
 export default async function ChatCompletions(context: Context) {
@@ -35,14 +36,42 @@ export default async function ChatCompletions(context: Context) {
         stderr: "pipe",
     });
 
+    pipeStderr(proc.stderr);
+
+    // ── 非串流模式（stream: false） ────────────────────────────────────────
+    if (!isStream) {
+        try {
+            const content = proc.stdout
+                ? await collectStreamedContent(proc.stdout)
+                : '';
+
+            await proc.exited;
+            await geminiArg.cleanTempFile();
+
+            // gemini 回傳空內容時不能將空字串送回客戶端（opencode 會拒絕）
+            if (!content) {
+                throw new HTTPException(502, { message: "Gemini returned an empty response. Please try again." });
+            }
+
+            const toolCallIndex = content.indexOf(TOOL_CALL_PREFIX);
+            if (hasTools && toolCallIndex !== -1) {
+                return context.json(buildToolCallNonStreamResponse(content.slice(toolCallIndex), modelName));
+            }
+            return context.json(buildNonStreamResponse(content, modelName));
+        } catch (err) {
+            await geminiArg.cleanTempFile();
+            if (err instanceof HTTPException) throw err;
+            throw new HTTPException(500, { message: "Gemini CLI error", cause: err });
+        }
+    }
+
+    // ── 串流模式（stream: true 或預設） ───────────────────────────────────
     context.header("Content-Type", "text/event-stream; charset=utf-8");
     context.header("Cache-Control", "no-cache");
     context.header("Connection", "keep-alive");
     context.header("X-Accel-Buffering", "no");
 
     return stream(context, async (s) => {
-        pipeStderr(proc.stderr);
-
         if (proc.stdout) {
             if (hasTools) {
                 await handleToolStream(proc.stdout, s, modelName);
@@ -52,8 +81,6 @@ export default async function ChatCompletions(context: Context) {
         }
 
         await proc.exited;
-        // const exitCode = await proc.exited;
-        // console.log(`[Process] Gemini CLI exited with code: ${exitCode}`);
         await geminiArg.cleanTempFile();
     });
 }

@@ -81,4 +81,57 @@ export async function sendToolCallSSE(stream: { write: (data: string) => any }, 
     await stream.write("data: [DONE]\n\n");
 }
 
+/** 建構非串流的純文字 JSON 回應（OpenAI chat.completion 格式） */
+export function buildNonStreamResponse(content: string, modelName: string, finishReason = 'stop') {
+    return {
+        id: `chatcmpl-${Date.now()}`,
+        object: "chat.completion",
+        created: Math.floor(Date.now() / 1000),
+        model: modelName,
+        choices: [{
+            index: 0,
+            message: { role: "assistant", content },
+            finish_reason: finishReason,
+        }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    };
+}
+
+/** 建構非串流的 tool_calls JSON 回應 */
+export function buildToolCallNonStreamResponse(toolCallLine: string, modelName: string) {
+    let toolCall: { name: string; arguments: any };
+    try {
+        toolCall = JSON.parse(toolCallLine.slice(TOOL_CALL_PREFIX.length).trim());
+    } catch {
+        console.warn('[ToolCall] Failed to parse non-stream tool call JSON:', toolCallLine);
+        return buildNonStreamResponse(toolCallLine, modelName);
+    }
+
+    const callId = `call_${Date.now()}`;
+    const argsStr = typeof toolCall.arguments === 'string'
+        ? toolCall.arguments
+        : JSON.stringify(toolCall.arguments);
+
+    return {
+        id: `chatcmpl-${Date.now()}`,
+        object: "chat.completion",
+        created: Math.floor(Date.now() / 1000),
+        model: modelName,
+        choices: [{
+            index: 0,
+            message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [{
+                    id: callId,
+                    type: "function",
+                    function: { name: toolCall.name, arguments: argsStr },
+                }],
+            },
+            finish_reason: "tool_calls",
+        }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    };
+}
+
 export { TOOL_CALL_PREFIX };
