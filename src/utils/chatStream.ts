@@ -1,4 +1,5 @@
 import { toSSEChunk, sendToolCallSSE, TOOL_CALL_PREFIX } from "./sseFormatter";
+import { logger } from "./logger";
 
 /**
  * 將 gemini CLI 的 stderr 輸出轉到 console（過濾憑證提示）。
@@ -13,7 +14,7 @@ export function pipeStderr(
         for await (const chunk of stderr) {
             const text = decoder.decode(chunk);
             if (text.includes("Loaded cached credentials.")) continue;
-            console.error(`[Gemini CLI Error] ${text}`);
+            logger.warn('Gemini CLI stderr', { text: text.trim() });
         }
     })();
 }
@@ -41,7 +42,7 @@ export async function handleToolStream(
                     await flushToolOrText(stream, accumulatedContent.trim(), modelName);
                 }
             } catch {
-                console.warn(`[Stream] Failed to parse JSON: ${line}`);
+                logger.warn('Stream: failed to parse JSON', { line });
             }
         }
     }
@@ -69,7 +70,7 @@ export async function handleTextStream(
                     await stream.write("data: [DONE]\n\n");
                 }
             } catch {
-                console.warn(`[Stream] Failed to parse JSON: ${line}`);
+                logger.warn('Stream: failed to parse JSON', { line });
             }
         }
     }
@@ -84,7 +85,7 @@ export async function flushToolOrText(
     const toolCallIndex = fullContent.indexOf(TOOL_CALL_PREFIX);
     if (toolCallIndex !== -1) {
         const toolCallStr = fullContent.slice(toolCallIndex);
-        console.log(`[ToolCall] Detected: ${toolCallStr.substring(0, 80)}...`);
+        logger.info('ToolCall detected', { preview: toolCallStr.substring(0, 80) });
         await sendToolCallSSE(stream, toolCallStr, modelName);
     } else {
         if (fullContent) await stream.write(toSSEChunk(fullContent, modelName));
@@ -117,7 +118,7 @@ export async function collectStreamedContent(
                     accumulated += event.content;
                 }
             } catch {
-                console.warn(`[NonStream] Failed to parse JSON: ${line}`);
+                logger.warn('NonStream: failed to parse JSON', { line });
             }
         }
     }

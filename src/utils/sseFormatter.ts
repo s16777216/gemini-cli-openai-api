@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 const TOOL_CALL_PREFIX = 'TOOL_CALL:';
 
 /** 將文字內容包裝成 OpenAI SSE chunk 格式 */
@@ -22,7 +24,7 @@ export async function sendToolCallSSE(stream: { write: (data: string) => any }, 
     try {
         toolCall = JSON.parse(toolCallLine.slice(TOOL_CALL_PREFIX.length).trim());
     } catch (e) {
-        console.warn('[ToolCall] Failed to parse tool call JSON:', toolCallLine);
+        logger.warn('ToolCall: failed to parse tool call JSON (SSE)', { raw: toolCallLine.slice(0, 120) });
         await stream.write(toSSEChunk(toolCallLine, modelName));
         await stream.write(toSSEChunk("", modelName, "stop"));
         await stream.write("data: [DONE]\n\n");
@@ -103,7 +105,7 @@ export function buildToolCallNonStreamResponse(toolCallLine: string, modelName: 
     try {
         toolCall = JSON.parse(toolCallLine.slice(TOOL_CALL_PREFIX.length).trim());
     } catch {
-        console.warn('[ToolCall] Failed to parse non-stream tool call JSON:', toolCallLine);
+        logger.warn('ToolCall: failed to parse non-stream tool call JSON', { raw: toolCallLine.slice(0, 120) });
         return buildNonStreamResponse(toolCallLine, modelName);
     }
 

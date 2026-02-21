@@ -7,13 +7,14 @@ import { flattenMessages, buildPromptWithTools } from "../utils/promptBuilder";
 import { handleToolStream, handleTextStream, pipeStderr, collectStreamedContent } from "../utils/chatStream";
 import { buildNonStreamResponse, buildToolCallNonStreamResponse, TOOL_CALL_PREFIX } from "../utils/sseFormatter";
 import { config } from "../config";
+import { logger } from "../utils/logger";
 
 export default async function ChatCompletions(context: Context) {
     const body = await context.req.json();
     const result = ChatCompletionSchema.safeParse(body);
 
     if (!result.success) {
-        console.warn(`[Request] Invalid request body: ${JSON.stringify(body)}`);
+        logger.warn('Invalid request body', { body: JSON.stringify(body).slice(0, 200) });
         throw new HTTPException(400, {
             message: "Invalid request body",
             cause: result.error
@@ -27,7 +28,7 @@ export default async function ChatCompletions(context: Context) {
     const flatText = flattenMessages(messages as Message[]);
     const prompt = hasTools ? buildPromptWithTools(flatText, tools) : flatText;
 
-    console.log(`[Request] Stream: ${isStream}, Prompt: ${prompt.length} chars, Tools: ${hasTools ? tools.length : 0}`);
+    logger.info('Incoming request', { stream: isStream, promptLen: prompt.length, tools: hasTools ? tools.length : 0, model: modelName });
 
     const geminiArg = new GeminiArgument(prompt, modelName);
     const command = await geminiArg.toCommand();
