@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "bun src/index.ts",
     "start:node": "node dist/index.js",
-    "test": "bun test.js"
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "keywords": [],
   "author": "",

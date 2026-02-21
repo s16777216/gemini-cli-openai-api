@@ -15,6 +15,7 @@
 - [使用範例](#使用範例)
 - [支援模型](#支援模型)
 - [工具呼叫（Tool Calls）](#工具呼叫tool-calls)
+- [單元測試](#單元測試)
 - [環境變數](#環境變數)
 - [專案結構](#專案結構)
 - [授權](#授權)
@@ -176,6 +177,24 @@ API Key 欄位填入任意字串即可（本代理不驗證 Key）。
 
 ---
 
+## 單元測試
+
+測試使用 [Bun 的內建測試工具](https://bun.sh/docs/cli/test)，無需額外安裝。
+
+```bash
+bun test           # 執行所有測試
+bun test --watch   # 監聽模式（存檔自動重跑）
+```
+
+| 測試檔案                            | 涵蓋模組                                        |
+| ----------------------------------- | ----------------------------------------------- |
+| `tests/schemas/chat.test.ts`        | Zod 驗證（MessageSchema、ChatCompletionSchema） |
+| `tests/utils/sseFormatter.test.ts`  | SSE chunk 格式與 finish_reason                  |
+| `tests/utils/chatStream.test.ts`    | `splitLines`、`flushToolOrText` 分支邏輯        |
+| `tests/utils/promptBuilder.test.ts` | 訊息展平、工具提示注入                          |
+
+---
+
 ## 環境變數
 
 ```env
@@ -200,11 +219,19 @@ src/
 │   └── gemini.ts               # GeminiArgument（CLI 命令建構與暫存檔管理）
 ├── utils/
 │   ├── promptBuilder.ts        # flattenMessages + buildPromptWithTools
-│   └── sseFormatter.ts         # toSSEChunk + sendToolCallSSE
+│   ├── sseFormatter.ts         # toSSEChunk + sendToolCallSSE
+│   └── chatStream.ts           # handleToolStream、handleTextStream、flushToolOrText 等
 └── implements/
     ├── index.ts                # Handler 匯出集合
     ├── chat.ts                 # POST /v1/chat/completions 核心實作
     └── modelList.ts            # GET /v1/models
+tests/
+├── schemas/
+│   └── chat.test.ts
+└── utils/
+    ├── sseFormatter.test.ts
+    ├── chatStream.test.ts
+    └── promptBuilder.test.ts
 temp/                           # 暫存提示檔（自動管理）
 package.json
 tsconfig.json
