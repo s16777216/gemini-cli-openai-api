@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini CLI API Playground</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --sidebar-bg: #161b22;
+            --border-color: #30363d;
+            --text-color: #c9d1d9;
+            --accent-color: #58a6ff;
+            --log-bg: #000;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 頂部控制列 */
+        header {
+            padding: 10px 20px;
+            background-color: var(--sidebar-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        select,
+        button,
+        input[type="checkbox"] {
+            background: #21262d;
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 5px 10px;
+            border-radius: 6px;
+        }
+
+        /* 主區域 */
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 左側聊天區 */
+        #chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 10px 15px;
+            border-radius: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .user {
+            align-self: flex-end;
+            background-color: #238636;
+        }
+
+        .assistant {
+            align-self: flex-start;
+            background-color: #30363d;
+        }
+
+        .system {
+            align-self: center;
+            font-size: 0.8em;
+            color: #8b949e;
+        }
+
+        #input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        #prompt-input {
+            flex: 1;
+            background: #21262d;
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        /* 右側 Log 區 */
+        #log-section {
+            width: 400px;
+            background-color: var(--log-bg);
+            display: flex;
+            flex-direction: column;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+        }
+
+        #log-section header {
+            background-color: #161b22;
+            font-weight: bold;
+            padding: 8px 15px;
+        }
+
+        #raw-logs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            color: #7ee787;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #111;
+            padding-bottom: 5px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-timestamp {
+            color: #8b949e;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div style="font-weight: bold; font-size: 1.2em; color: var(--accent-color);">Gemini API Playground</div>
+        <div>
+            Model: <select id="model-select">
+                <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+            </select>
+        </div>
+        <label>
+            <input type="checkbox" id="stream-check" checked> Stream
+        </label>
+        <button onclick="clearChat()">Clear</button>
+    </header>
+
+    <main>
+        <section id="chat-section">
+            <div id="messages">
+                <div class="message system">歡迎來到 Gemini CLI API Playground。請輸入訊息開始測試。</div>
+            </div>
+            <div id="input-area">
+                <input type="text" id="prompt-input" placeholder="輸入訊息..."
+                    onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()" id="send-btn">Send</button>
+            </div>
+        </section>
+
+        <section id="log-section">
+            <header>Raw SSE Logs</header>
+            <div id="raw-logs"></div>
+        </section>
+    </main>
+
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const logsContainer = document.getElementById('raw-logs');
+        const modelSelect = document.getElementById('model-select');
+        const streamCheck = document.getElementById('stream-check');
+        const promptInput = document.getElementById('prompt-input');
+
+        let history = [];
+
+        // 初始化模型清單
+        async function fetchModels() {
+            try {
+                const res = await fetch('/v1/models');
+                const data = await res.json();
+                if (data.data) {
+                    modelSelect.innerHTML = data.data.map(m => `<option value="${m.id}">${m.id}</option>`).join('');
+                }
+            } catch (e) {
+                addLog("Failed to fetch models: " + e.message);
+            }
+        }
+        fetchModels();
+
+        function addMessage(role, content) {
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.textContent = content;
+            messagesContainer.appendChild(div);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return div;
+        }
+
+        function addLog(text) {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            const ts = new Date().toLocaleTimeString();
+            div.innerHTML = `<span class="log-timestamp">[${ts}]</span> <span class="log-text">${text}</span>`;
+            logsContainer.appendChild(div);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        function clearChat() {
+            messagesContainer.innerHTML = '<div class="message system">Chat cleared.</div>';
+            logsContainer.innerHTML = '';
+            history = [];
+        }
+
+        async function sendMessage() {
+            const text = promptInput.value.trim();
+            if (!text) return;
+
+            promptInput.value = '';
+            addMessage('user', text);
+            history.push({ role: 'user', content: text });
+
+            const isStream = streamCheck.checked;
+            const model = modelSelect.value;
+
+            const assistantMsgDiv = addMessage('assistant', '...');
+            let assistantContent = '';
+
+            try {
+                const response = await fetch('/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model,
+                        messages: history,
+                        stream: isStream
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.text();
+                    assistantMsgDiv.textContent = "Error: " + err;
+                    addLog("API Error: " + err);
+                    return;
+                }
+
+                if (isStream) {
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    assistantMsgDiv.textContent = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                addLog(line);
+                                const dataStr = line.slice(6);
+                                if (dataStr === '[DONE]') continue;
+
+                                try {
+                                    const json = JSON.parse(dataStr);
+                                    const delta = json.choices[0].delta;
+                                    if (delta && delta.content) {
+                                        assistantContent += delta.content;
+                                        assistantMsgDiv.textContent = assistantContent;
+                                    }
+                                } catch (e) { }
+                            }
+                        }
+                    }
+                } else {
+                    const data = await response.json();
+                    addLog(JSON.stringify(data));
+                    assistantContent = data.choices[0].message.content;
+                    assistantMsgDiv.textContent = assistantContent;
+                }
+
+                history.push({ role: 'assistant', content: assistantContent });
+            } catch (e) {
+                assistantMsgDiv.textContent = "Request failed: " + e.message;
+                addLog("Fetch Error: " + e.message);
+            }
+        }
+    </script>
+
+</body>
+
+</html>
