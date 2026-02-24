@@ -10,4 +10,7 @@ export const config = {
         "gemini-3-flash-preview",
         "gemini-3-pro-preview",
     ],
+    jwtSecret: Bun.env.JWT_SECRET || "default-secret-change-me",
+    rootUser: Bun.env.ROOT_USER || "admin",
+    rootPassword: Bun.env.ROOT_PASSWORD || "admin",
 } as const;
