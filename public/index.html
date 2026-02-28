@@ -492,6 +492,46 @@
             text-align: center;
         }
 
+        /* AI 思考動畫 */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            height: 24px;
+            padding-left: 4px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #8e9196;
+            border-radius: 50%;
+            animation: glowPulse 1.5s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes glowPulse {
+
+            0%,
+            100% {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.1);
+                background: var(--text-sec);
+            }
+        }
+
         .login-card h1 {
             font-family: var(--font-google);
             font-size: 2.2em;
@@ -911,7 +951,17 @@
 
             const content = document.createElement('div');
             content.className = 'msg-content';
-            content.textContent = text;
+            if (role === 'ai' && text === '...') {
+                content.innerHTML = `
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                `;
+            } else {
+                content.textContent = text;
+            }
 
             row.appendChild(avatar);
             row.appendChild(content);
