@@ -3,6 +3,7 @@ import ChatCompletions from "./chat";
 import ModelList from "./modelList";
 import { ListKeys, CreateKey, RevokeKey } from "./keys";
 import { Login } from "./admin";
+import { ListSessions, GetSessionHistory, DeleteSession } from "./sessions";
 
 interface Implementations {
     ChatCompletions: (c: Context) => Promise<Response>;
@@ -11,6 +12,9 @@ interface Implementations {
     CreateKey: (c: Context) => Promise<Response>;
     RevokeKey: (c: Context) => Promise<Response>;
     Login: (c: Context) => Promise<Response>;
+    ListSessions: (c: Context) => Promise<Response>;
+    GetSessionHistory: (c: Context) => Promise<Response>;
+    DeleteSession: (c: Context) => Promise<Response>;
 }
 
 const Implementations: Implementations = {
@@ -19,7 +23,10 @@ const Implementations: Implementations = {
     ListKeys,
     CreateKey,
     RevokeKey,
-    Login
+    Login,
+    ListSessions,
+    GetSessionHistory,
+    DeleteSession
 };
 
 export default Implementations;

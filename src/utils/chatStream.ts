@@ -21,13 +21,13 @@ export function pipeStderr(
 
 /**
  * 工具模式：緩衝完整回應後判斷是否為 TOOL_CALL，
- * 再以對應的 SSE 格式回傳。
+ * 再以對應的 SSE 格式回傳。回傳累計的純文字內容。
  */
 export async function handleToolStream(
     stdout: AsyncIterable<Uint8Array>,
     stream: { write: (data: string) => any },
     modelName: string
-) {
+): Promise<string> {
     const decoder = new TextDecoder();
     let accumulatedContent = '';
 
@@ -42,21 +42,23 @@ export async function handleToolStream(
                     await flushToolOrText(stream, accumulatedContent.trim(), modelName);
                 }
             } catch {
-                logger.warn('Stream: failed to parse JSON', { line });
+                logger.warn('Stream: failed to parse JSON', { line: line.slice(0, 100) });
             }
         }
     }
+    return accumulatedContent.trim();
 }
 
 /**
- * 純文字串流模式：邊收邊送，達到即時串流效果。
+ * 純文字串流模式：邊收邊送，達到即時串流效果。回傳累計的純文字內容。
  */
 export async function handleTextStream(
     stdout: AsyncIterable<Uint8Array>,
     stream: { write: (data: string) => any },
     modelName: string
-) {
+): Promise<string> {
     const decoder = new TextDecoder();
+    let accumulatedContent = '';
 
     for await (const chunk of stdout) {
         const text = decoder.decode(chunk, { stream: true });
@@ -64,16 +66,18 @@ export async function handleTextStream(
             try {
                 const event = JSON.parse(line);
                 if (event.type === 'message' && event.role === 'assistant' && event.content) {
+                    accumulatedContent += event.content;
                     await stream.write(toSSEChunk(event.content, modelName));
                 } else if (event.type === 'result') {
                     await stream.write(toSSEChunk("", modelName, "stop"));
                     await stream.write("data: [DONE]\n\n");
                 }
             } catch {
-                logger.warn('Stream: failed to parse JSON', { line });
+                logger.warn('Stream: failed to parse JSON', { line: line.slice(0, 100) });
             }
         }
     }
+    return accumulatedContent.trim();
 }
 
 /** 決定要發送 tool_call SSE 還是純文字 SSE */

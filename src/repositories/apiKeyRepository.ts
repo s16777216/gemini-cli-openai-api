@@ -31,6 +31,28 @@ export class ApiKeyRepository {
                 createdAt INTEGER
             )
         `);
+
+        // 重新加入：Session 歷史紀錄表
+        this.db.run(`
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                model TEXT,
+                updatedAt INTEGER
+            )
+        `);
+
+        // 重新加入：訊息明細表
+        this.db.run(`
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sessionId TEXT,
+                role TEXT,
+                content TEXT,
+                createdAt INTEGER,
+                FOREIGN KEY(sessionId) REFERENCES sessions(id) ON DELETE CASCADE
+            )
+        `);
     }
 
     public findAll(): ApiKey[] {

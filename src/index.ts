@@ -23,7 +23,11 @@ app.basePath('/v1')
     // 標準 OpenAI 相容端點
     .get('/', (c) => c.text('Gemini CLI Proxy is running!'))
     .get('/models', Implementations.ModelList)
-    .post('/chat/completions', Implementations.ChatCompletions);
+    .post('/chat/completions', Implementations.ChatCompletions)
+    // 恢復：Session 歷史管理
+    .get('/sessions', Implementations.ListSessions)
+    .get('/sessions/:id', Implementations.GetSessionHistory)
+    .delete('/sessions/:id', Implementations.DeleteSession);
 
 export default {
     port: config.port,

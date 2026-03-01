@@ -10,6 +10,10 @@
         rel="stylesheet">
     <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <!-- Markdown & Syntax Highlighting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
         :root {
             --bg-main: #131314;
@@ -592,6 +596,156 @@
             mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2L14.4 7.2L20 8L16 12L16.9 17.6L12 15L7.1 17.6L8 12L4 8L9.6 7.2L12 2Z"/></svg>') no-repeat center;
             -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2L14.4 7.2L20 8L16 12L16.9 17.6L12 15L7.1 17.6L8 12L4 8L9.6 7.2L12 2Z"/></svg>') no-repeat center;
         }
+
+        /* Session 列表樣式 */
+        .session-list {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 0 8px;
+            overflow-y: auto;
+            max-height: calc(100vh - 250px);
+        }
+
+        .session-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #bdc1c6;
+            font-size: 0.9em;
+            gap: 12px;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .session-item:hover {
+            background: #2b2c2f;
+            color: #fff;
+        }
+
+        .session-item.active {
+            background: #3c3d3f;
+            color: #fff;
+        }
+
+        .session-title {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .session-delete {
+            opacity: 0;
+            font-size: 18px !important;
+            color: #9aa0a6;
+            transition: opacity 0.2s;
+            padding: 4px;
+            /* 增加點擊範圍 */
+            z-index: 10;
+            /* 確保在最上層 */
+        }
+
+        .session-item:hover .session-delete {
+            opacity: 1;
+        }
+
+        .session-delete:hover {
+            color: #f28b82 !important;
+        }
+
+        aside.collapsed .session-title,
+        aside.collapsed .session-delete {
+            opacity: 0;
+            display: none;
+        }
+
+        aside.collapsed .session-list {
+            padding: 0;
+            align-items: center;
+        }
+
+        aside.collapsed .session-item {
+            justify-content: center;
+            width: 48px;
+            padding: 10px 0;
+        }
+
+        /* Markdown Styles */
+        .msg-content h1,
+        .msg-content h2,
+        .msg-content h3 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-family: var(--font-google);
+            color: #fff;
+        }
+
+        .msg-content p {
+            margin-bottom: 12px;
+        }
+
+        .msg-content ul,
+        .msg-content ol {
+            margin-left: 24px;
+            margin-bottom: 12px;
+        }
+
+        .msg-content li {
+            margin-bottom: 4px;
+        }
+
+        .msg-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+            background: #1e1f20;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .msg-content th,
+        .msg-content td {
+            padding: 12px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .msg-content th {
+            background: #2b2c2f;
+        }
+
+        .msg-content blockquote {
+            border-left: 4px solid var(--border);
+            padding-left: 16px;
+            color: var(--text-sec);
+            font-style: italic;
+            margin: 16px 0;
+        }
+
+        .msg-content pre {
+            background: #0d0d0d !important;
+            padding: 16px;
+            border-radius: 12px;
+            margin: 16px 0;
+            border: 1px solid var(--border);
+        }
+
+        .msg-content code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        .msg-content pre code {
+            background: transparent;
+            padding: 0;
+        }
     </style>
 </head>
 
@@ -627,6 +781,10 @@
             <span class="material-symbols-outlined collapsed-show">add</span>
             <span class="sidebar-text">對話調試</span>
         </button>
+
+        <div id="session-list" class="session-list">
+            <!-- 歷史對話將注入於此 -->
+        </div>
 
         <nav class="sidebar-nav">
             <a class="nav-item active" id="nav-chat" onclick="switchView('chat')">
@@ -741,13 +899,24 @@
 
     <script>
         let token = localStorage.getItem('gemini_playground_token');
+        let currentSessionId = null;
 
         if (token) initSystem();
 
-        function initSystem() {
-            document.getElementById('login-overlay').style.display = 'none';
-            fetchModels();
-            fetchKeys();
+        async function initSystem() {
+            console.log('初始化系統...');
+            const overlay = document.getElementById('login-overlay');
+            if (overlay) overlay.style.display = 'none';
+
+            try {
+                await Promise.all([
+                    fetchModels(),
+                    fetchKeys(),
+                    fetchSessions()
+                ]);
+            } catch (e) {
+                console.warn('部分初始化任務失敗', e);
+            }
         }
 
         function toggleSidebar() {
@@ -793,10 +962,12 @@
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             document.getElementById('chat-view').style.display = view === 'chat' ? 'flex' : 'none';
             document.getElementById('keys-view').style.display = view === 'keys' ? 'block' : 'none';
-            document.getElementById('nav-' + (view === 'chat' ? 'chat' : 'keys')).classList.add('active');
+            if (view === 'keys') document.getElementById('nav-keys').classList.add('active');
+            else if (view === 'chat' && !currentSessionId) document.querySelector('.new-chat-btn').classList.add('active');
         }
 
         function resetChat() {
+            currentSessionId = null;
             document.getElementById('chat-container').innerHTML = `
                 <div class="message-row">
                     <div class="avatar ai">
@@ -805,25 +976,77 @@
                     <div class="msg-content">你好。我是 Gemini 代理解析器。請輸入任何提示...</div>
                 </div>
             `;
+            document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
+            document.querySelector('.new-chat-btn').classList.add('active');
             switchView('chat');
+        }
+
+        async function fetchSessions() {
+            if (!token) return;
+            const res = await fetch('/v1/sessions', { headers: { 'Authorization': `Bearer ${token}` } });
+            const { data } = await res.json();
+            const list = document.getElementById('session-list');
+            list.innerHTML = data.map(s => `
+                <div class="session-item ${currentSessionId === s.id ? 'active' : ''}" onclick="loadSession('${s.id}')">
+                    <span class="material-symbols-outlined">chat_bubble</span>
+                    <span class="session-title">${s.title}</span>
+                    <span class="material-symbols-outlined session-delete" onclick="event.stopPropagation(); deleteSession('${s.id}')">delete</span>
+                </div>
+            `).join('');
+        }
+
+        async function loadSession(id) {
+            currentSessionId = id;
+            const res = await fetch(`/v1/sessions/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const { data } = await res.json();
+
+            const container = document.getElementById('chat-container');
+            container.innerHTML = '';
+            data.messages.forEach(m => {
+                appendMessage(m.role, m.content);
+            });
+
+            document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
+            document.querySelector('.new-chat-btn').classList.remove('active');
+            fetchSessions();
+            switchView('chat');
+        }
+
+        async function deleteSession(id) {
+            await fetch(`/v1/sessions/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            if (currentSessionId === id) resetChat();
+            fetchSessions();
         }
 
         async function login() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const res = await fetch('/v1/admin/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
+            const errorEl = document.getElementById('login-error');
+            errorEl.textContent = '';
 
-            if (res.ok) {
-                const data = await res.json();
-                token = data.token;
-                localStorage.setItem('gemini_playground_token', token);
-                initSystem();
-            } else {
-                document.getElementById('login-error').textContent = '登入失敗，請檢查帳號密碼';
+            try {
+                console.log('正在嘗試登入...', username);
+                const res = await fetch('/v1/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('登入成功', data);
+                    token = data.token;
+                    localStorage.setItem('gemini_playground_token', token);
+                    await initSystem();
+                    console.log('系統初始化完成');
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    console.error('登入失敗回應', res.status, errData);
+                    errorEl.textContent = `登入失敗: ${errData.message || res.statusText}`;
+                }
+            } catch (e) {
+                console.error('登入過程發生異常', e);
+                errorEl.textContent = '連線錯誤: ' + e.message;
             }
         }
 
@@ -888,11 +1111,11 @@
             const prompt = promptInput.value.trim();
             if (!prompt) return;
             promptInput.value = '';
-            promptInput.style.height = 'auto'; // 重設高度
+            promptInput.style.height = 'auto';
             toggleSendBtn('');
 
             appendMessage('user', prompt);
-            const aiMsgDiv = appendMessage('ai', '...');
+            const aiMsgEl = appendMessage('ai', '...');
 
             try {
                 const res = await fetch('/v1/chat/completions', {
@@ -901,13 +1124,14 @@
                     body: JSON.stringify({
                         model: document.getElementById('model-select').value,
                         messages: [{ role: 'user', content: prompt }],
-                        stream: true
+                        stream: true,
+                        sessionId: currentSessionId
                     })
                 });
 
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
-                aiMsgDiv.textContent = '';
+                aiMsgEl.innerHTML = '';
                 let fullText = '';
 
                 while (true) {
@@ -924,15 +1148,21 @@
                                 const content = json.choices[0].delta.content;
                                 if (content) {
                                     fullText += content;
-                                    aiMsgDiv.textContent = fullText;
+                                    renderMarkdown(aiMsgEl, fullText);
                                     document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
                                 }
                             } catch (e) { }
                         }
                     }
                 }
+
+                const newSessionId = res.headers.get('x-session-id');
+                if (newSessionId && !currentSessionId) {
+                    currentSessionId = newSessionId;
+                    fetchSessions();
+                }
             } catch (e) {
-                aiMsgDiv.textContent = '發生錯誤: ' + e.message;
+                aiMsgEl.textContent = '發生錯誤: ' + e.message;
             }
         }
 
@@ -949,25 +1179,29 @@
                 avatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="url(#gemini_grad)"/></svg>`;
             }
 
-            const content = document.createElement('div');
-            content.className = 'msg-content';
-            if (role === 'ai' && text === '...') {
-                content.innerHTML = `
-                    <div class="typing-indicator">
-                        <div class="typing-dot"></div>
-                        <div class="typing-dot"></div>
-                        <div class="typing-dot"></div>
-                    </div>
-                `;
-            } else {
-                content.textContent = text;
-            }
+            const contentEl = document.createElement('div');
+            contentEl.className = 'msg-content';
 
             row.appendChild(avatar);
-            row.appendChild(content);
+            row.appendChild(contentEl);
             container.appendChild(row);
+
+            if (text !== '...') {
+                if (role === 'ai') renderMarkdown(contentEl, text);
+                else contentEl.textContent = text;
+            } else {
+                contentEl.textContent = '...';
+            }
+
             container.scrollTop = container.scrollHeight;
-            return content;
+            return contentEl;
+        }
+
+        function renderMarkdown(el, text) {
+            el.innerHTML = marked.parse(text);
+            el.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
         }
     </script>
 </body>
