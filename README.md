@@ -75,7 +75,7 @@ bun run dev
 bun run start
 ```
 
-伺服器預設在 **`http://localhost:3000`** 啟動。
+伺服器預設在 **`http://localhost:3002`** 啟動。
 
 ### 使用 Node.js（不使用 Bun）
 
@@ -97,7 +97,7 @@ npm run start:node # 執行編譯後的版本
 
 ### 2. 初始化 Gemini 登入
 
-由於 `gemini-cli` 使用 OAuth 驗證，你需要**第一次進入容器內**完成登入，未來即可透過 volume `/root/.config/configstore` 重複使用登入態：
+由於 `gemini-cli` 使用 OAuth 驗證，你需要**第一次進入容器內**完成登入，未來即可透過 volume `/root/.gemini` 重複使用登入態：
 
 ```bash
 docker-compose run --rm gemini-proxy gemini
@@ -113,7 +113,7 @@ docker-compose run --rm gemini-proxy gemini
 docker-compose up -d
 ```
 
-伺服器將執行於 http://localhost:3000。
+伺服器將執行於 http://localhost:3002。
 所有的 SQLite 資料會被存入 `./data/` 目錄中以確保持久化。
 
 ---
@@ -135,7 +135,7 @@ docker-compose up -d
 ### curl（串流模式）
 
 ```bash
-curl -N http://localhost:3000/v1/chat/completions \
+curl -N http://localhost:3002/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-2.5-flash",
@@ -151,7 +151,7 @@ curl -N http://localhost:3000/v1/chat/completions \
 將任何支援自訂 OpenAI Base URL 的工具指向：
 
 ```
-http://localhost:3000/v1
+http://localhost:3002/v1
 ```
 
 API Key 欄位填入任意字串即可（本代理不驗證 Key）。
@@ -163,7 +163,7 @@ API Key 欄位填入任意字串即可（本代理不驗證 Key）。
   "provider": {
     "gemini-proxy": {
       "options": {
-        "baseURL": "http://localhost:3000/v1"
+        "baseURL": "http://localhost:3002/v1"
       },
       "models": {
         "gemini-2.5-flash": {
@@ -237,7 +237,7 @@ cp .env.example .env
 
 | 變數          | 說明                             | 預設值   |
 | ------------- | -------------------------------- | -------- |
-| `PORT`        | 伺服器監聽埠號                   | `3000`   |
+| `PORT`        | 伺服器監聽埠號                   | `3002`   |
 | `TEMP_FOLDER` | 暫存提示檔目錄                   | `./temp` |
 | `LOG_LEVEL`   | `debug`、`info`、`warn`、`error` | `info`   |
 | `LOG_FORMAT`  | `text`（彩色）或 `json`          | `text`   |

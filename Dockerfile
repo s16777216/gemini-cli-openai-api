@@ -18,7 +18,7 @@ RUN bun install --frozen-lockfile || bun install
 COPY . .
 
 # 曝露預設通訊埠
-EXPOSE 3000
+EXPOSE 3002
 
 # 設定執行指令
 CMD ["bun", "run", "start"]

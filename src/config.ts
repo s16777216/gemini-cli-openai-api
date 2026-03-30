@@ -1,5 +1,5 @@
 export const config = {
-    port: Number(Bun.env.PORT ?? 3000),
+    port: Number(Bun.env.PORT ?? 3002),
     idleTimeout: 120,
     tempFolder: Bun.env.TEMP_FOLDER ?? "./temp",
     defaultModel: "gemini-2.5-flash",
