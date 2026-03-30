@@ -59,10 +59,10 @@ export default async function ChatCompletions(context: Context) {
     logger.info('Incoming request', { stream: isStream, promptLen: prompt.length, tools: hasTools ? tools.length : 0, model: modelName, sessionId });
 
     const geminiArg = new GeminiArgument(prompt, modelName);
-    const command = await geminiArg.toCommand();
-    const proc = Bun.spawn(["pwsh", "-Command", command.join(" ")], {
+    const commandArgs = await geminiArg.toCommand();
+    const proc = Bun.spawn(commandArgs, {
         stdout: "pipe",
-        stderr: "pipe",
+        stderr: "pipe"
     });
 
     pipeStderr(proc.stderr);

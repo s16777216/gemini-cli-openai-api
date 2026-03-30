@@ -1,3 +1,6 @@
 node_modules/*
 temp/*
 *.db
+data/*
+gemini-config/*
+!.gitkeep

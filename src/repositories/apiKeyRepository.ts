@@ -1,16 +1,20 @@
 import { Database } from "bun:sqlite";
-import { join } from "path";
+import { dirname } from "path";
+import * as fs from "fs";
+import { config } from "../config";
 import type { ApiKey } from "../schemas/apiKey";
 import { logger } from "../utils/logger";
-
-const DB_PATH = join(process.cwd(), "api_keys.db");
 
 export class ApiKeyRepository {
     private static instance: ApiKeyRepository;
     private db: Database;
 
     private constructor() {
-        this.db = new Database(DB_PATH);
+        const dir = dirname(config.databasePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        this.db = new Database(config.databasePath);
         this.init();
     }
 

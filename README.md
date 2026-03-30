@@ -11,6 +11,7 @@
 - [運作原理](#運作原理)
 - [前置需求](#前置需求)
 - [安裝與啟動](#安裝與啟動)
+- [Docker 部署](#docker-部署)
 - [API 端點](#api-端點)
 - [使用範例](#使用範例)
 - [支援模型](#支援模型)
@@ -83,6 +84,37 @@ npm run dev:node   # 開發模式（tsx watch）
 npm run build      # 型別檢查（tsc，noEmit）
 npm run start:node # 執行編譯後的版本
 ```
+
+---
+
+## Docker 部署
+
+我們提供 `Dockerfile` 與 `docker-compose.yml` 方便直接佈署於容器環境中，這將自動處理系統依賴與字元編碼，並享有全作業系統相容性。
+
+### 1. 啟動準備
+
+請確保系統中已安裝 [Docker](https://docs.docker.com/get-docker/) 與 Docker Compose。
+
+### 2. 初始化 Gemini 登入
+
+由於 `gemini-cli` 使用 OAuth 驗證，你需要**第一次進入容器內**完成登入，未來即可透過 volume `/root/.config/configstore` 重複使用登入態：
+
+```bash
+docker-compose run --rm gemini-proxy gemini
+```
+
+終端機將出現一段 Google 登入網址，請複製至瀏覽器完成授權。授權成功後，你可以按下 `Ctrl+C` 離開。
+
+### 3. 背景啟動服務
+
+完成登入後，以背景模式啟動代理伺服器：
+
+```bash
+docker-compose up -d
+```
+
+伺服器將執行於 http://localhost:3000。
+所有的 SQLite 資料會被存入 `./data/` 目錄中以確保持久化。
 
 ---
 

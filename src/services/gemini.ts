@@ -1,3 +1,5 @@
+import os from "os";
+import path from "path";
 import { config } from "../config";
 
 export class GeminiArgument {
@@ -13,7 +15,14 @@ export class GeminiArgument {
 
     async toCommand(): Promise<string[]> {
         const tempFilePath = await this.writeTempFile(this.prompt);
-        return ["cat", `"${tempFilePath}"`, "|", "gemini", "--model", this.model, "--output-format", "stream-json"];
+        const args = ["--model", this.model, "--output-format", "stream-json"];
+        const isWindows = os.platform() === "win32";
+
+        if (isWindows) {
+            return ["pwsh", "-Command", `cat "${tempFilePath}" | gemini ${args.join(" ")}`];
+        } else {
+            return ["sh", "-c", `cat "${tempFilePath}" | gemini ${args.join(" ")}`];
+        }
     }
 
     private async writeTempFile(prompt: string): Promise<string> {

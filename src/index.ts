@@ -4,8 +4,12 @@ import { serveStatic } from 'hono/bun';
 import Implementations from './implements';
 import { config } from './config';
 import { authMiddleware } from './utils/auth';
+import { ApiKeyRepository } from './repositories/apiKeyRepository';
 
 const app = new Hono();
+
+// 強制在伺服器啟動時建立資料庫與 Table，確保 Session/Messages 可用
+ApiKeyRepository.getInstance();
 
 app.use('*', logger());
 

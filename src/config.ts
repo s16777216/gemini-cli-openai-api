@@ -13,5 +13,5 @@ export const config = {
     jwtSecret: Bun.env.JWT_SECRET || "default-secret-change-me",
     rootUser: Bun.env.ROOT_USER || "admin",
     rootPassword: Bun.env.ROOT_PASSWORD || "admin",
-    databasePath: "./api_keys.db",
+    databasePath: Bun.env.DATABASE_PATH || "./data/api_keys.db",
 } as const;
