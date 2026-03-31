@@ -50,14 +50,6 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        gemini: {
-          bg: "#131314",
-          side: "#1e1f20",
-          hover: "#282a2c",
-          border: "#444746",
-          text: "#e3e3e3",
-          sec: "#c4c7c5",
-        }
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -78,9 +70,6 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
-      backgroundImage: {
-        'gemini-gradient': 'linear-gradient(74deg, #4285f4 0, #9171ee 35%, #d96570 65%, #f3af4a 100%)',
-      }
     },
   },
   plugins: [require("tailwindcss-animate"), require("tailwindcss-animated")],

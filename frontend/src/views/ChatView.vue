@@ -114,45 +114,47 @@ const handleSend = async () => {
 </script>
 
 <template>
-  <div class="flex h-screen bg-gemini-bg text-gemini-text overflow-hidden selection:bg-primary/20">
-    <!-- Sidebar (Same as before) -->
-    <aside class="w-72 bg-gemini-side border-r border-gemini-border flex flex-col hidden md:flex">
-      <div class="p-6 flex items-center gap-3 border-b border-gemini-border/30">
-        <div class="w-8 h-8 rounded-lg gemini-gradient shadow-xl"></div>
+  <div class="flex h-screen bg-background text-foreground overflow-hidden selection:bg-primary/20">
+    <!-- Sidebar -->
+    <aside class="w-72 bg-muted/30 border-r border-border flex flex-col hidden md:flex">
+      <div class="p-6 flex items-center gap-3 border-b border-border">
+        <div class="w-8 h-8 rounded-lg bg-primary shadow-lg flex items-center justify-center">
+          <Sparkles class="w-5 h-5 text-primary-foreground" />
+        </div>
         <span class="text-xl font-bold tracking-tight">Gemini Pro</span>
       </div>
       
-      <nav class="flex-1 overflow-y-auto p-4 space-y-2">
-        <Button @click="clearChat" variant="ghost" class="w-full justify-start gap-4 hover:bg-gemini-hover rounded-xl text-gemini-sec hover:text-white transition-all h-12">
+      <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+        <Button @click="clearChat" variant="ghost" class="w-full justify-start gap-3 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-all">
           <Trash2 class="w-4 h-4 text-destructive" />
           清除對話
         </Button>
         <div class="pt-4 px-2">
-          <p class="text-[10px] font-bold text-gemini-border uppercase tracking-widest mb-3 px-2">功能項目</p>
-          <Button variant="ghost" class="w-full justify-start gap-4 hover:bg-gemini-hover rounded-xl text-gemini-sec hover:text-white transition-all h-11">
+          <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-1">功能項目</p>
+          <Button variant="ghost" class="w-full justify-start gap-3 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-all">
             <Sparkles class="w-4 h-4 text-primary" />
             新建模型會話
           </Button>
-          <Button variant="ghost" class="w-full justify-start gap-4 hover:bg-gemini-hover rounded-xl text-gemini-sec hover:text-white transition-all h-11">
+          <Button variant="ghost" class="w-full justify-start gap-3 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-all">
             <History class="w-4 h-4" />
             歷史對話
           </Button>
         </div>
       </nav>
       
-      <div class="p-6 border-t border-gemini-border/30 space-y-4">
-        <div class="flex items-center gap-4 px-3 py-3 bg-gemini-hover/50 rounded-2xl border border-gemini-border/20 backdrop-blur-md">
-          <div class="w-10 h-10 rounded-full gemini-gradient flex items-center justify-center p-0.5">
-            <div class="bg-gemini-side w-full h-full rounded-full flex items-center justify-center">
-              <User class="w-5 h-5 text-primary" />
+      <div class="p-4 border-t border-border space-y-4">
+        <div class="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
+          <div class="w-9 h-9 rounded-full bg-primary flex items-center justify-center p-0.5">
+            <div class="bg-background w-full h-full rounded-full flex items-center justify-center">
+              <User class="w-4 h-4 text-primary" />
             </div>
           </div>
           <div class="flex-1 overflow-hidden">
-            <p class="text-xs text-gemini-sec font-medium">Session Active</p>
-            <p class="text-xs truncate font-mono text-white/70">{{ props.token.substring(0, 16) }}...</p>
+            <p class="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Session Active</p>
+            <p class="text-xs truncate font-mono opacity-80">{{ props.token.substring(0, 12) }}...</p>
           </div>
         </div>
-        <Button @click="handleLogout" variant="ghost" class="w-full justify-start gap-4 text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-xl h-11">
+        <Button @click="handleLogout" variant="ghost" class="w-full justify-start gap-3 text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-md">
           <LogOut class="w-4 h-4" />
           登出主控台
         </Button>
@@ -160,24 +162,24 @@ const handleSend = async () => {
     </aside>
 
     <!-- Main Chat Area -->
-    <main class="flex-1 flex flex-col relative bg-[radial-gradient(circle_at_50%_0%,#1e1f20_0%,#131314_100%)]">
+    <main class="flex-1 flex flex-col relative bg-background">
       <!-- Mobile Header -->
-      <header class="md:hidden h-14 border-b border-gemini-border px-4 flex items-center gap-4 bg-gemini-bg/50 backdrop-blur-xl sticky top-0 z-50">
-        <Button variant="ghost" size="icon" class="rounded-xl">
+      <header class="md:hidden h-14 border-b border-border px-4 flex items-center gap-4 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
+        <Button variant="ghost" size="icon" class="rounded-md">
           <Menu class="w-5 h-5" />
         </Button>
-        <span class="font-bold gemini-text-gradient">Gemini Pro</span>
+        <span class="font-bold text-primary">Gemini Pro</span>
       </header>
 
       <!-- Message List -->
       <div ref="scrollContainer" class="flex-1 overflow-y-auto p-4 md:px-12 md:py-8 space-y-8 scroll-smooth custom-scrollbar">
-        <div v-if="messages.length === 0" class="h-full flex flex-col items-center justify-center space-y-8 py-20">
-          <div class="w-24 h-24 rounded-[2.5rem] gemini-gradient shadow-2xl animate-pulse flex items-center justify-center group">
-            <Sparkles class="w-12 h-12 text-white group-hover:scale-110 transition-transform" />
+        <div v-if="messages.length === 0" class="h-full flex flex-col items-center justify-center space-y-6 py-20">
+          <div class="w-20 h-20 rounded-2xl bg-primary shadow-xl flex items-center justify-center">
+            <Sparkles class="w-10 h-10 text-primary-foreground" />
           </div>
-          <div class="text-center space-y-3 max-w-lg mx-auto">
-            <h3 class="text-4xl font-bold tracking-tight text-white">您好，有什麼我能幫您的嗎？</h3>
-            <p class="text-gemini-sec text-lg">我是 Gemini Pro，專為您的專案設計的 API 代理主控台。</p>
+          <div class="text-center space-y-2 max-w-lg mx-auto">
+            <h3 class="text-3xl font-bold tracking-tight">有什麼我能幫您的嗎？</h3>
+            <p class="text-muted-foreground text-base">Gemini Pro API 代理主控台</p>
           </div>
         </div>
 
@@ -185,25 +187,25 @@ const handleSend = async () => {
           class="max-w-4xl mx-auto flex gap-5 group animate-in fade-in slide-in-from-bottom-3 duration-700"
           :class="msg.role === 'user' ? 'flex-row-reverse' : ''"
         >
-          <div class="w-9 h-9 md:w-11 md:h-11 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-lg transition-transform group-hover:scale-105"
-            :class="msg.role === 'assistant' ? 'gemini-gradient' : 'bg-gemini-hover border border-gemini-border'"
+          <div class="w-9 h-9 md:w-10 md:h-10 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md"
+            :class="msg.role === 'assistant' ? 'bg-primary' : 'bg-muted border border-border'"
           >
-            <Bot v-if="msg.role === 'assistant'" class="w-5 h-5 md:w-6 md:h-6 text-white" />
-            <User v-else class="w-5 h-5 md:w-6 md:h-6 text-gemini-sec" />
+            <Bot v-if="msg.role === 'assistant'" class="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
+            <User v-else class="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
           </div>
           
-          <div class="flex-1 space-y-3" :class="msg.role === 'user' ? 'text-right' : ''">
+          <div class="flex-1 space-y-2" :class="msg.role === 'user' ? 'text-right' : ''">
             <div class="flex items-center gap-2 mb-1" :class="msg.role === 'user' ? 'flex-row-reverse' : ''">
-              <span class="text-xs font-bold uppercase tracking-widest text-gemini-border">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
                 {{ msg.role === 'assistant' ? 'Gemini Pro' : 'You' }}
               </span>
             </div>
             <div 
-              class="prose prose-invert max-w-none text-sm md:text-lg leading-relaxed whitespace-pre-wrap selection:bg-white/20"
-              :class="msg.role === 'assistant' ? 'text-gemini-text pl-1' : 'bg-gemini-hover/80 px-5 py-4 rounded-[1.5rem] inline-block text-left border border-white/5 backdrop-blur-sm'"
+              class="prose prose-invert max-w-none text-sm md:text-base leading-relaxed whitespace-pre-wrap"
+              :class="msg.role === 'assistant' ? 'text-foreground' : 'bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-tr-none inline-block text-left shadow-sm'"
             >
               {{ msg.content }}
-              <span v-if="isStreaming && idx === messages.length - 1 && msg.role === 'assistant'" class="inline-block w-2 h-6 bg-primary/80 ml-1 rounded-sm animate-pulse align-middle"></span>
+              <span v-if="isStreaming && idx === messages.length - 1 && msg.role === 'assistant'" class="inline-block w-2 h-4 bg-primary/80 ml-1 rounded-sm animate-pulse align-middle"></span>
               <div v-if="!msg.content && isStreaming && idx === messages.length - 1" class="flex gap-1.5 py-2">
                  <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-75"></div>
                  <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-150"></div>
@@ -216,42 +218,42 @@ const handleSend = async () => {
 
       <!-- Input Area -->
       <div class="p-6 md:p-10 pt-0 max-w-5xl mx-auto w-full">
-        <Card class="bg-gemini-side/80 border-gemini-border/40 border-2 rounded-[2.5rem] overflow-hidden focus-within:border-primary/40 transition-all shadow-2xl backdrop-blur-3xl group">
-          <div class="flex items-end p-5 gap-3">
-            <Button variant="ghost" size="icon" class="rounded-full h-12 w-12 text-gemini-sec hover:text-white hover:bg-white/5 transition-all">
-              <Paperclip class="w-6 h-6 rotate-12" />
+        <Card class="bg-card border-border border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xl group">
+          <div class="flex items-end p-4 gap-2">
+            <Button variant="ghost" size="icon" class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground">
+              <Paperclip class="w-5 h-5" />
             </Button>
             
             <textarea 
               v-model="inputText"
               rows="1"
               placeholder="與 Gemini 對話..."
-              class="flex-1 bg-transparent border-none focus:ring-0 text-base md:text-lg py-3 resize-none max-h-60 custom-scrollbar outline-none placeholder:text-gemini-border text-white selection:bg-white/20"
+              class="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-base py-2.5 resize-none max-h-60 custom-scrollbar outline-none placeholder:text-muted-foreground"
               @keydown.enter.prevent="handleSend"
             ></textarea>
             
             <div class="flex items-center gap-2">
-              <Button variant="ghost" size="icon" class="rounded-full h-12 w-12 text-gemini-sec hover:text-white hove:bg-white/5 hidden md:flex">
-                <Mic class="w-6 h-6" />
+              <Button variant="ghost" size="icon" class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hidden md:flex">
+                <Mic class="w-5 h-5" />
               </Button>
               <Button 
                 @click="handleSend"
                 size="icon" 
-                class="rounded-full h-12 w-12 gemini-gradient text-white shadow-xl active:scale-95 transition-all disabled:opacity-30 disabled:grayscale hover:brightness-110"
+                class="rounded-md h-10 w-10 bg-primary text-primary-foreground shadow-sm active:scale-95 transition-all disabled:opacity-50"
                 :disabled="!inputText.trim() || isStreaming"
               >
                 <div class="flex items-center justify-center">
-                  <Send class="w-5 h-5 ml-1" v-if="!isStreaming" />
-                  <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" v-else></div>
+                  <Send class="w-4 h-4" v-if="!isStreaming" />
+                  <div class="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" v-else></div>
                 </div>
               </Button>
             </div>
           </div>
         </Card>
-        <p class="text-[11px] text-center mt-5 text-gemini-border font-medium tracking-wide flex items-center justify-center gap-2">
+        <p class="text-[10px] text-center mt-5 text-muted-foreground/60 font-medium tracking-wide flex items-center justify-center gap-2">
           <span>Gemini Pro Console v1.0</span>
-          <span class="w-1 h-1 rounded-full bg-gemini-border"></span>
-          <span>基於 Vue 3 & shadcn-vue</span>
+          <span class="w-1 h-1 rounded-full bg-border"></span>
+          <span>Shadcn Zinc Theme</span>
         </p>
       </div>
     </main>

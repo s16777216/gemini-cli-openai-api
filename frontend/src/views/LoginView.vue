@@ -45,17 +45,17 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gemini-bg p-4 bg-[radial-gradient(circle_at_50%_10%,#1e1f20_0%,#131314_100%)]">
-    <Card class="max-w-md w-full border-none bg-transparent shadow-2xl">
+  <div class="min-h-screen flex items-center justify-center bg-background p-4">
+    <Card class="max-w-md w-full border-border bg-card shadow-xl">
       <CardHeader class="text-center space-y-4">
-        <div class="mx-auto w-16 h-16 rounded-2xl gemini-gradient flex items-center justify-center shadow-lg animate-in zoom-in duration-700">
-          <ShieldCheck class="w-8 h-8 text-white" />
+        <div class="mx-auto w-16 h-16 rounded-xl bg-primary flex items-center justify-center shadow-lg animate-in zoom-in duration-700">
+          <ShieldCheck class="w-8 h-8 text-primary-foreground" />
         </div>
-        <CardTitle class="text-4xl font-bold gemini-text-gradient tracking-tight">
+        <CardTitle class="text-3xl font-bold tracking-tight">
           Gemini Pro Console
         </CardTitle>
-        <CardDescription class="text-gemini-sec text-base">
-          請登入以存取 Gemini Pro Console 代理
+        <CardDescription class="text-muted-foreground text-base">
+          請登入以存取管理員主控台
         </CardDescription>
       </CardHeader>
       
@@ -66,38 +66,38 @@ const handleLogin = async () => {
           </div>
 
           <div class="space-y-2">
-            <label class="text-sm font-medium text-gemini-sec ml-1">使用者名稱</label>
+            <label class="text-sm font-medium text-foreground ml-1">使用者名稱</label>
             <div class="relative group">
-              <User class="absolute left-3 top-3 w-4 h-4 text-gemini-border group-focus-within:text-white transition-colors" />
+              <User class="absolute left-3 top-3 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input 
                 v-model="username"
                 type="text" 
                 placeholder="Username" 
                 required
-                class="pl-10 h-12 bg-gemini-hover border-gemini-border focus:ring-gemini-gradient transition-all duration-300 rounded-xl"
+                class="pl-10 h-11 bg-background border-input focus:border-primary transition-all duration-300"
               />
             </div>
           </div>
 
           <div class="space-y-2">
-            <label class="text-sm font-medium text-gemini-sec ml-1">密碼</label>
+            <label class="text-sm font-medium text-foreground ml-1">密碼</label>
             <div class="relative group">
-              <Lock class="absolute left-3 top-3 w-4 h-4 text-gemini-border group-focus-within:text-white transition-colors" />
+              <Lock class="absolute left-3 top-3 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input 
                 v-model="password"
                 type="password" 
                 placeholder="Password" 
                 required
-                class="pl-10 h-12 bg-gemini-hover border-gemini-border focus:ring-gemini-gradient transition-all duration-300 rounded-xl"
+                class="pl-10 h-11 bg-background border-input focus:border-primary transition-all duration-300"
               />
             </div>
           </div>
           
           <Button 
             type="submit"
-            variant="gemini" 
+            variant="default" 
             :disabled="isLoading"
-            class="w-full h-12 text-lg font-bold rounded-xl shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98] mt-4"
+            class="w-full h-11 text-base font-bold shadow-md hover:shadow-lg transition-all active:scale-[0.98] mt-4"
           >
             <span v-if="isLoading">登入中...</span>
             <span v-else>啟動主控台</span>
@@ -105,9 +105,9 @@ const handleLogin = async () => {
         </form>
       </CardContent>
       
-      <CardFooter class="justify-center pt-8 border-t border-gemini-border/30 mt-6">
-        <p class="text-xs text-gemini-border">
-          您的金鑰僅儲存在本地瀏覽器
+      <CardFooter class="justify-center pt-6 border-t border-border mt-8">
+        <p class="text-xs text-muted-foreground">
+          您的安全憑證僅儲存在本地瀏覽器
         </p>
       </CardFooter>
     </Card>

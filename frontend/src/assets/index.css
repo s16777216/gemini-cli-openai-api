@@ -56,16 +56,5 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    background: radial-gradient(circle at 50% 10%, #1c1c1e 0%, #131314 100%);
   }
-}
-
-.gemini-gradient {
-  background: linear-gradient(74deg, #4285f4 0, #9171ee 35%, #d96570 65%, #f3af4a 100%);
-}
-
-.gemini-text-gradient {
-  @apply gemini-gradient;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
