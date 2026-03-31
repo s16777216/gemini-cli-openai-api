@@ -1,14 +1,17 @@
 <script setup lang="ts">
-// App.vue 現在只負責全域佈局與路由渲染
+import ToastProvider from '@/components/ToastProvider.vue'
 </script>
 
 <template>
-  <div class="bg-background min-h-screen text-foreground font-sans selection:bg-primary/30 selection:text-white">
+  <div class="bg-background min-h-screen text-foreground font-sans selection:bg-primary/30 selection:text-white relative">
     <router-view v-slot="{ Component }">
       <transition name="fade" mode="out-in">
         <component :is="Component" />
       </transition>
     </router-view>
+    
+    <!-- 全域通知 -->
+    <ToastProvider />
   </div>
 </template>
 

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
+import type { Session, ApiKey, ApiResponse, SuccessResponse } from '../types/api'
 
 const api = axios.create({
   baseURL: '/v1',
@@ -19,7 +20,7 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error)
 })
 
-// Response Interceptor for global error handling (Optional)
+// Response Interceptor for global error handling
 api.interceptors.response.use((response) => response, (error) => {
   if (error.response?.status === 401) {
     const authStore = useAuthStore()
@@ -28,5 +29,19 @@ api.interceptors.response.use((response) => response, (error) => {
   }
   return Promise.reject(error)
 })
+
+/**
+ * Session API
+ */
+export const getSessions = () => api.get<ApiResponse<Session[]>>('/sessions')
+export const getSession = (id: string) => api.get<ApiResponse<Session>>(`/sessions/${id}`)
+export const deleteSession = (id: string) => api.delete<SuccessResponse>(`/sessions/${id}`)
+
+/**
+ * API Key Management API
+ */
+export const getApiKeys = () => api.get<ApiResponse<ApiKey[]>>('/admin/keys')
+export const createApiKey = (label: string) => api.post<ApiResponse<ApiKey>>('/admin/keys', { label })
+export const revokeApiKey = (id: string) => api.delete<SuccessResponse>(`/admin/keys/${id}`)
 
 export default api
