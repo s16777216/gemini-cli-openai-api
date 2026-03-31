@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { User, Lock, ShieldCheck } from 'lucide-vue-next'
+import api from '@/lib/api'
 
-const token = defineModel('token', { type: String })
-const emit = defineEmits(['login'])
+const authStore = useAuthStore()
+const router = useRouter()
+
 const username = ref('')
 const password = ref('')
 const isLoading = ref(false)
@@ -19,25 +23,16 @@ const handleLogin = async () => {
   error.value = ''
   
   try {
-    const res = await fetch('/v1/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        username: username.value, 
-        password: password.value 
-      })
+    const res = await api.post('/admin/login', {
+      username: username.value, 
+      password: password.value 
     })
 
-    if (res.ok) {
-      const data = await res.json()
-      token.value = data.token
-      emit('login')
-    } else {
-      const err = await res.json().catch(() => ({}))
-      error.value = err.message || '登入失敗，請檢查帳號密碼'
-    }
-  } catch (e) {
-    error.value = '連線失敗，請檢查後端服務'
+    authStore.setToken(res.data.token) // 存入全域 Store
+    router.push('/chat') // 跳轉至對話頁面
+  } catch (e: any) {
+    console.error('Login error:', e)
+    error.value = e.response?.data?.message || '登入失敗，請檢查帳號密碼'
   } finally {
     isLoading.value = false
   }

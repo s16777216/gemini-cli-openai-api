@@ -1,21 +1,31 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { 
   Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2
 } from 'lucide-vue-next'
 
-// Session and state
-const props = defineProps<{
-  token: string
-  onLogout?: () => void
-}>()
+// AI SDK and state
+import { useChat } from '@ai-sdk/vue'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 
-const messages = ref<{ role: string, content: string }[]>([])
-const inputText = ref('')
-const isStreaming = ref(false)
+const authStore = useAuthStore()
+const router = useRouter()
+
 const scrollContainer = ref<HTMLElement | null>(null)
+
+// Vercel AI SDK hook
+const { messages, input, handleSubmit, isLoading, setMessages } = useChat({
+  api: '/v1/chat/completions',
+  headers: {
+    'Authorization': `Bearer ${authStore.token}`
+  },
+  body: {
+    model: 'gemini-2.5-flash'
+  }
+})
 
 // Auto scroll logic
 const scrollToBottom = async () => {
@@ -25,92 +35,28 @@ const scrollToBottom = async () => {
   }
 }
 
+// Watch messages to auto-scroll
+watch(messages, () => {
+  scrollToBottom()
+}, { deep: true })
+
 // Session handling
 const handleLogout = () => {
-  if (props.onLogout) {
-    props.onLogout()
-  } else {
-    window.location.reload()
-  }
+  authStore.clearToken()
+  router.push('/login')
 }
 
 const clearChat = () => {
-  messages.value = []
+  setMessages([])
 }
 
-// SSE Streaming Logic
-const handleSend = async () => {
-  if (!inputText.value.trim() || isStreaming.value) return
-  
-  const userMessage = inputText.value.trim()
-  messages.value.push({ role: 'user', content: userMessage })
-  inputText.value = ''
-  scrollToBottom()
-  
-  isStreaming.value = true
-  messages.value.push({ role: 'assistant', content: '' })
-  
-  try {
-    const response = await fetch('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${props.token}`
-      },
-      body: JSON.stringify({
-        model: 'gemini-2.5-flash',
-        messages: messages.value.slice(0, -1), // Send history, exclude the empty assistant message
-        stream: true
-      })
-    })
-
-    if (!response.ok) throw new Error('API 請求失敗')
-    
-    const reader = response.body?.getReader()
-    if (!reader) throw new Error('無法讀取串流數據')
-
-    const decoder = new TextDecoder()
-    let buffer = ''
-    
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmedLine = line.trim()
-        if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue
-        
-        const dataStr = trimmedLine.replace('data: ', '')
-        if (dataStr === '[DONE]') {
-          isStreaming.value = false
-          break
-        }
-
-        try {
-          const json = JSON.parse(dataStr)
-          const content = json.choices[0]?.delta?.content || ''
-          if (content) {
-            messages.value[messages.value.length - 1].content += content
-            scrollToBottom()
-          }
-        } catch (e) {
-          console.warn('JSON 解析失敗:', e)
-        }
-      }
-    }
-  } catch (error) {
-    console.error('串流對話出錯:', error)
-    messages.value[messages.value.length - 1].content = '發生錯誤，請稍後再試。'
-  } finally {
-    isStreaming.value = false
+// Handle Enter key for submission
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    handleSubmit(e)
   }
 }
-
-// Listen for paste to auto-grow? (Optional enhancement)
 </script>
 
 <template>
@@ -151,7 +97,7 @@ const handleSend = async () => {
           </div>
           <div class="flex-1 overflow-hidden">
             <p class="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Session Active</p>
-            <p class="text-xs truncate font-mono opacity-80">{{ props.token.substring(0, 12) }}...</p>
+            <p class="text-xs truncate font-mono opacity-80">{{ authStore.token.substring(0, 12) }}...</p>
           </div>
         </div>
         <Button @click="handleLogout" variant="ghost" class="w-full justify-start gap-3 text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-md">
@@ -183,7 +129,7 @@ const handleSend = async () => {
           </div>
         </div>
 
-        <div v-for="(msg, idx) in messages" :key="idx" 
+        <div v-for="(msg, idx) in messages" :key="msg.id || idx" 
           class="max-w-4xl mx-auto flex gap-5 group animate-in fade-in slide-in-from-bottom-3 duration-700"
           :class="msg.role === 'user' ? 'flex-row-reverse' : ''"
         >
@@ -205,8 +151,8 @@ const handleSend = async () => {
               :class="msg.role === 'assistant' ? 'text-foreground' : 'bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-tr-none inline-block text-left shadow-sm'"
             >
               {{ msg.content }}
-              <span v-if="isStreaming && idx === messages.length - 1 && msg.role === 'assistant'" class="inline-block w-2 h-4 bg-primary/80 ml-1 rounded-sm animate-pulse align-middle"></span>
-              <div v-if="!msg.content && isStreaming && idx === messages.length - 1" class="flex gap-1.5 py-2">
+              <span v-if="isLoading && idx === messages.length - 1 && msg.role === 'assistant'" class="inline-block w-2 h-4 bg-primary/80 ml-1 rounded-sm animate-pulse align-middle"></span>
+              <div v-if="!msg.content && isLoading && idx === messages.length - 1" class="flex gap-1.5 py-2">
                  <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-75"></div>
                  <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-150"></div>
                  <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-300"></div>
@@ -218,38 +164,40 @@ const handleSend = async () => {
 
       <!-- Input Area -->
       <div class="p-6 md:p-10 pt-0 max-w-5xl mx-auto w-full">
-        <Card class="bg-card border-border border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xl group">
-          <div class="flex items-end p-4 gap-2">
-            <Button variant="ghost" size="icon" class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground">
-              <Paperclip class="w-5 h-5" />
-            </Button>
-            
-            <textarea 
-              v-model="inputText"
-              rows="1"
-              placeholder="與 Gemini 對話..."
-              class="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-base py-2.5 resize-none max-h-60 custom-scrollbar outline-none placeholder:text-muted-foreground"
-              @keydown.enter.prevent="handleSend"
-            ></textarea>
-            
-            <div class="flex items-center gap-2">
-              <Button variant="ghost" size="icon" class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hidden md:flex">
-                <Mic class="w-5 h-5" />
+        <form @submit="handleSubmit" class="relative">
+          <Card class="bg-card border-border border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xl group">
+            <div class="flex items-end p-4 gap-2">
+              <Button type="button" variant="ghost" size="icon" class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground">
+                <Paperclip class="w-5 h-5" />
               </Button>
-              <Button 
-                @click="handleSend"
-                size="icon" 
-                class="rounded-md h-10 w-10 bg-primary text-primary-foreground shadow-sm active:scale-95 transition-all disabled:opacity-50"
-                :disabled="!inputText.trim() || isStreaming"
-              >
-                <div class="flex items-center justify-center">
-                  <Send class="w-4 h-4" v-if="!isStreaming" />
-                  <div class="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" v-else></div>
-                </div>
-              </Button>
+              
+              <textarea 
+                v-model="input"
+                rows="1"
+                placeholder="與 Gemini 對話..."
+                class="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-base py-2.5 resize-none max-h-60 custom-scrollbar outline-none placeholder:text-muted-foreground"
+                @keydown="handleKeyDown"
+              ></textarea>
+              
+              <div class="flex items-center gap-2">
+                <Button type="button" variant="ghost" size="icon" class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hidden md:flex">
+                  <Mic class="w-5 h-5" />
+                </Button>
+                <Button 
+                  type="submit"
+                  size="icon" 
+                  class="rounded-md h-10 w-10 bg-primary text-primary-foreground shadow-sm active:scale-95 transition-all disabled:opacity-50"
+                  :disabled="!input.trim() || isLoading"
+                >
+                  <div class="flex items-center justify-center">
+                    <Send class="w-4 h-4" v-if="!isLoading" />
+                    <div class="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" v-else></div>
+                  </div>
+                </Button>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </form>
         <p class="text-[10px] text-center mt-5 text-muted-foreground/60 font-medium tracking-wide flex items-center justify-center gap-2">
           <span>Gemini Pro Console v1.0</span>
           <span class="w-1 h-1 rounded-full bg-border"></span>

@@ -1,36 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useStorage } from '@vueuse/core'
-import LoginView from '@/views/LoginView.vue'
-import ChatView from '@/views/ChatView.vue'
-
-const sessionKey = useStorage('gemini_playground_token', '')
-const isAuthenticated = ref(false)
-
-const checkAuth = () => {
-  isAuthenticated.value = !!sessionKey.value
-}
-
-const handleLogin = () => {
-  isAuthenticated.value = true
-}
-
-const handleLogout = () => {
-  sessionKey.value = ''
-  isAuthenticated.value = false
-}
-
-onMounted(() => {
-  checkAuth()
-})
+// App.vue 現在只負責全域佈局與路由渲染
 </script>
 
 <template>
-  <div class="bg-gemini-bg min-h-screen text-gemini-text font-sans selection:bg-primary/30 selection:text-white">
-    <transition name="fade" mode="out-in">
-      <LoginView v-if="!isAuthenticated" @login="handleLogin" v-model:token="sessionKey" />
-      <ChatView v-else :token="sessionKey" @logout="handleLogout" />
-    </transition>
+  <div class="bg-background min-h-screen text-foreground font-sans selection:bg-primary/30 selection:text-white">
+    <router-view v-slot="{ Component }">
+      <transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
   </div>
 </template>
 
@@ -45,7 +23,7 @@ onMounted(() => {
   opacity: 0;
 }
 
-/* Global scrollbar for dark mode */
+/* 全域捲軸樣式 (Zinc 深色模式) */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -56,12 +34,12 @@ onMounted(() => {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #444746;
+  background: #27272a; /* Zinc 800 */
   border-radius: 10px;
-  border: 3px solid #131314;
+  border: 3px solid #09090b; /* Zinc 950 */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5f6368;
+  background: #3f3f46; /* Zinc 700 */
 }
 </style>
