@@ -14,7 +14,11 @@ ApiKeyRepository.getInstance();
 app.use('*', logger());
 
 // WebUI 靜態檔案服務
+// 先嘗試服務新版 Vue 前端 (dist)，若不存在則回退到舊版 public
+app.use('/*', serveStatic({ root: './frontend/dist' }));
 app.use('/*', serveStatic({ root: './public' }));
+
+app.get('/', serveStatic({ path: './frontend/dist/index.html' }));
 app.get('/', serveStatic({ path: './public/index.html' }));
 
 app.basePath('/v1')
