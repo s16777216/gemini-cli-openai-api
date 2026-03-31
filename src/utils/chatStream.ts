@@ -30,19 +30,25 @@ export async function handleToolStream(
 ): Promise<string> {
     const decoder = new TextDecoder();
     let accumulatedContent = '';
+    let buffer = '';
 
     for await (const chunk of stdout) {
-        const text = decoder.decode(chunk, { stream: true });
-        for (const line of splitLines(text)) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 最後一行如果不完整，留在 buffer 中
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
             try {
-                const event = JSON.parse(line);
+                const event = JSON.parse(trimmed);
                 if (event.type === 'message' && event.role === 'assistant' && event.content) {
                     accumulatedContent += event.content;
                 } else if (event.type === 'result') {
                     await flushToolOrText(stream, accumulatedContent.trim(), modelName);
                 }
             } catch {
-                logger.warn('Stream: failed to parse JSON', { line: line.slice(0, 100) });
+                logger.warn('Stream(Tool): failed to parse JSON', { line: trimmed.slice(0, 100) });
             }
         }
     }
@@ -59,12 +65,18 @@ export async function handleTextStream(
 ): Promise<string> {
     const decoder = new TextDecoder();
     let accumulatedContent = '';
+    let buffer = '';
 
     for await (const chunk of stdout) {
-        const text = decoder.decode(chunk, { stream: true });
-        for (const line of splitLines(text)) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
             try {
-                const event = JSON.parse(line);
+                const event = JSON.parse(trimmed);
                 if (event.type === 'message' && event.role === 'assistant' && event.content) {
                     accumulatedContent += event.content;
                     await stream.write(toSSEChunk(event.content, modelName));
@@ -73,7 +85,7 @@ export async function handleTextStream(
                     await stream.write("data: [DONE]\n\n");
                 }
             } catch {
-                logger.warn('Stream: failed to parse JSON', { line: line.slice(0, 100) });
+                logger.warn('Stream(Text): failed to parse JSON', { line: trimmed.slice(0, 100) });
             }
         }
     }
@@ -98,11 +110,6 @@ export async function flushToolOrText(
     }
 }
 
-/** 將 chunk 文字切行，並過濾空行 */
-export function splitLines(text: string): string[] {
-    return text.split('\n').filter(l => l.trim() !== '');
-}
-
 /**
  * 非串流模式：收集 gemini CLI 的完整回應文字並回傳。
  * 不送任何 SSE，由呼叫端決定如何包裝成 JSON。
@@ -112,17 +119,23 @@ export async function collectStreamedContent(
 ): Promise<string> {
     const decoder = new TextDecoder();
     let accumulated = '';
+    let buffer = '';
 
     for await (const chunk of stdout) {
-        const text = decoder.decode(chunk, { stream: true });
-        for (const line of splitLines(text)) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
             try {
-                const event = JSON.parse(line);
+                const event = JSON.parse(trimmed);
                 if (event.type === 'message' && event.role === 'assistant' && event.content) {
                     accumulated += event.content;
                 }
             } catch {
-                logger.warn('NonStream: failed to parse JSON', { line });
+                logger.warn('NonStream: failed to parse JSON', { line: trimmed });
             }
         }
     }

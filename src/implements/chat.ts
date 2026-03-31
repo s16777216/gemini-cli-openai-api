@@ -9,6 +9,7 @@ import { buildNonStreamResponse, buildToolCallNonStreamResponse, TOOL_CALL_PREFI
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { SessionRepository } from "../repositories/sessionRepository";
+import crypto from "node:crypto";
 
 export default async function ChatCompletions(context: Context) {
     const body = await context.req.json();
@@ -53,16 +54,25 @@ export default async function ChatCompletions(context: Context) {
         });
     }
 
+    const requestId = crypto.randomUUID().slice(0, 8);
     const flatText = flattenMessages(messages as Message[]);
     const prompt = hasTools ? buildPromptWithTools(flatText, tools) : flatText;
 
-    logger.info('Incoming request', { stream: isStream, promptLen: prompt.length, tools: hasTools ? tools.length : 0, model: modelName, sessionId });
+    logger.info('Incoming request', { requestId, stream: isStream, promptLen: prompt.length, tools: hasTools ? tools.length : 0, model: modelName, sessionId });
 
     const geminiArg = new GeminiArgument(prompt, modelName);
     const commandArgs = await geminiArg.toCommand();
     const proc = Bun.spawn(commandArgs, {
         stdout: "pipe",
         stderr: "pipe"
+    });
+
+    // 監聽連線中斷，主動殺掉進程
+    context.req.raw.signal.addEventListener('abort', () => {
+        if (proc.killed === false) {
+            logger.warn('Client disconnected, killing process', { requestId });
+            proc.kill();
+        }
     });
 
     pipeStderr(proc.stderr);
@@ -77,17 +87,20 @@ export default async function ChatCompletions(context: Context) {
             await proc.exited;
             await geminiArg.cleanTempFile();
 
-            if (!content) {
+            if (content) {
+                // 儲存 AI 回應
+                sessionRepo.addMessage({
+                    sessionId,
+                    role: 'ai',
+                    content,
+                    createdAt: Date.now()
+                });
+            } else {
+                if (proc.exitCode !== 0) {
+                    throw new HTTPException(500, { message: `Gemini CLI failed with exit code ${proc.exitCode}` });
+                }
                 throw new HTTPException(502, { message: "Gemini returned an empty response. Please try again." });
             }
-
-            // 儲存 AI 回應
-            sessionRepo.addMessage({
-                sessionId,
-                role: 'ai',
-                content,
-                createdAt: Date.now()
-            });
 
             const toolCallIndex = content.indexOf(TOOL_CALL_PREFIX);
             const response = hasTools && toolCallIndex !== -1
@@ -97,6 +110,7 @@ export default async function ChatCompletions(context: Context) {
             response.headers.set('x-session-id', sessionId);
             return response;
         } catch (err) {
+            if (proc.killed === false) proc.kill();
             await geminiArg.cleanTempFile();
             if (err instanceof HTTPException) throw err;
             throw new HTTPException(500, { message: "Gemini CLI error", cause: err });
@@ -112,24 +126,30 @@ export default async function ChatCompletions(context: Context) {
 
     return stream(context, async (s) => {
         let fullAiContent = '';
-        if (proc.stdout) {
-            if (hasTools) {
-                fullAiContent = await handleToolStream(proc.stdout, s, modelName);
-            } else {
-                fullAiContent = await handleTextStream(proc.stdout, s, modelName);
+        try {
+            if (proc.stdout) {
+                if (hasTools) {
+                    fullAiContent = await handleToolStream(proc.stdout, s, modelName);
+                } else {
+                    fullAiContent = await handleTextStream(proc.stdout, s, modelName);
+                }
             }
-        }
 
-        await proc.exited;
-        await geminiArg.cleanTempFile();
+            await proc.exited;
+            await geminiArg.cleanTempFile();
 
-        if (fullAiContent) {
-            sessionRepo.addMessage({
-                sessionId,
-                role: 'ai',
-                content: fullAiContent,
-                createdAt: Date.now()
-            });
+            if (fullAiContent) {
+                sessionRepo.addMessage({
+                    sessionId,
+                    role: 'ai',
+                    content: fullAiContent,
+                    createdAt: Date.now()
+                });
+            }
+        } catch (err) {
+            if (proc.killed === false) proc.kill();
+            await geminiArg.cleanTempFile();
+            logger.error('Streaming error', { requestId, error: String(err) });
         }
     });
 }
