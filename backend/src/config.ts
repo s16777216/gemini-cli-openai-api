@@ -14,4 +14,5 @@ export const config = {
     rootUser: Bun.env.ROOT_USER || "admin",
     rootPassword: Bun.env.ROOT_PASSWORD || "admin",
     databasePath: Bun.env.DATABASE_PATH || "./data/api_keys.db",
+    geminiCliPath: Bun.env.GEMINI_CLI_PATH || "C:/Program Files/nodejs/node_modules/@google/gemini-cli/dist/index.js",
 } as const;

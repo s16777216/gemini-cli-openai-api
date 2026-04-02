@@ -62,13 +62,26 @@ export default async function ChatCompletions(context: Context) {
     logger.info('Incoming request', { requestId, stream: isStream, promptLen: prompt.length, tools: hasTools ? tools.length : 0, model: modelName, sessionId });
 
     const geminiArg = new GeminiArgument(prompt, modelName);
-    const commandArgs = await geminiArg.toCommand();
+    const commandArgs = ["node", config.geminiCliPath, ...geminiArg.toArgs()];
     
     const spawnStart = performance.now();
     const proc = Bun.spawn(commandArgs, {
+        stdin: "pipe",
         stdout: "pipe",
-        stderr: "pipe"
+        stderr: "pipe",
+        env: {
+            ...Bun.env,
+            NO_UPDATE_CHECK: "1",
+            GEMINI_CLI_SKIP_UPDATE: "1"
+        }
     });
+
+    // 透過 stdin 傳遞 prompt
+    if (proc.stdin) {
+        proc.stdin.write(prompt);
+        proc.stdin.end();
+    }
+
     const spawnDuration = (performance.now() - spawnStart).toFixed(2);
     console.log(`[Perf] Process spawned: ${spawnDuration}ms`);
 
@@ -90,7 +103,6 @@ export default async function ChatCompletions(context: Context) {
                 : '';
 
             await proc.exited;
-            await geminiArg.cleanTempFile();
 
             if (content) {
                 // 儲存 AI 回應
@@ -116,7 +128,6 @@ export default async function ChatCompletions(context: Context) {
             return response;
         } catch (err) {
             if (proc.killed === false) proc.kill();
-            await geminiArg.cleanTempFile();
             if (err instanceof HTTPException) throw err;
             throw new HTTPException(500, { message: "Gemini CLI error", cause: err });
         }
@@ -141,7 +152,6 @@ export default async function ChatCompletions(context: Context) {
             }
 
             await proc.exited;
-            await geminiArg.cleanTempFile();
 
             if (fullAiContent) {
                 sessionRepo.addMessage({
@@ -153,7 +163,6 @@ export default async function ChatCompletions(context: Context) {
             }
         } catch (err) {
             if (proc.killed === false) proc.kill();
-            await geminiArg.cleanTempFile();
             logger.error('Streaming error', { requestId, error: String(err) });
         }
     });
