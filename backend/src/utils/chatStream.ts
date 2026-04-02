@@ -2,6 +2,13 @@ import { toSSEChunk, sendToolCallSSE, TOOL_CALL_PREFIX } from "./sseFormatter";
 import { logger } from "./logger";
 
 /**
+ * 將文字依換行符號切分並過濾掉空白或僅含空白字元的行。
+ */
+export function splitLines(text: string): string[] {
+    return text.split('\n').map(line => line.trim()).filter(line => line !== '');
+}
+
+/**
  * 將 gemini CLI 的 stderr 輸出轉到 console（過濾憑證提示）。
  * 非同步背景執行，不 await。
  */
@@ -26,13 +33,20 @@ export function pipeStderr(
 export async function handleToolStream(
     stdout: AsyncIterable<Uint8Array>,
     stream: { write: (data: string) => any },
-    modelName: string
+    modelName: string,
+    startTime: number
 ): Promise<string> {
     const decoder = new TextDecoder();
     let accumulatedContent = '';
     let buffer = '';
+    let firstByte = true;
 
     for await (const chunk of stdout) {
+        if (firstByte) {
+            const ttfb = (performance.now() - startTime).toFixed(2);
+            console.log(`[Perf] TTFB (Tool Stream): ${ttfb}ms`);
+            firstByte = false;
+        }
         buffer += decoder.decode(chunk, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || ''; // 最後一行如果不完整，留在 buffer 中
@@ -52,6 +66,8 @@ export async function handleToolStream(
             }
         }
     }
+    const totalDuration = (performance.now() - startTime).toFixed(2);
+    console.log(`[Perf] Tool Stream finished. Total duration: ${totalDuration}ms`);
     return accumulatedContent.trim();
 }
 
@@ -61,13 +77,20 @@ export async function handleToolStream(
 export async function handleTextStream(
     stdout: AsyncIterable<Uint8Array>,
     stream: { write: (data: string) => any },
-    modelName: string
+    modelName: string,
+    startTime: number
 ): Promise<string> {
     const decoder = new TextDecoder();
     let accumulatedContent = '';
     let buffer = '';
+    let firstByte = true;
 
     for await (const chunk of stdout) {
+        if (firstByte) {
+            const ttfb = (performance.now() - startTime).toFixed(2);
+            console.log(`[Perf] TTFB (Text Stream): ${ttfb}ms`);
+            firstByte = false;
+        }
         buffer += decoder.decode(chunk, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -89,6 +112,8 @@ export async function handleTextStream(
             }
         }
     }
+    const totalDuration = (performance.now() - startTime).toFixed(2);
+    console.log(`[Perf] Text Stream finished. Total duration: ${totalDuration}ms`);
     return accumulatedContent.trim();
 }
 
@@ -115,13 +140,20 @@ export async function flushToolOrText(
  * 不送任何 SSE，由呼叫端決定如何包裝成 JSON。
  */
 export async function collectStreamedContent(
-    stdout: AsyncIterable<Uint8Array>
+    stdout: AsyncIterable<Uint8Array>,
+    startTime: number
 ): Promise<string> {
     const decoder = new TextDecoder();
     let accumulated = '';
     let buffer = '';
+    let firstByte = true;
 
     for await (const chunk of stdout) {
+        if (firstByte) {
+            const ttfb = (performance.now() - startTime).toFixed(2);
+            console.log(`[Perf] TTFB (Collect): ${ttfb}ms`);
+            firstByte = false;
+        }
         buffer += decoder.decode(chunk, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -140,5 +172,7 @@ export async function collectStreamedContent(
         }
     }
 
+    const totalDuration = (performance.now() - startTime).toFixed(2);
+    console.log(`[Perf] Content collection finished. Total duration: ${totalDuration}ms`);
     return accumulated.trim();
 }

@@ -2,13 +2,15 @@ version: '3.8'
 
 services:
   gemini-proxy:
-    build: .
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: gemini-proxy
     ports:
       - "3002:3002"
     volumes:
-      # 掛載本機的 ./data 目錄以持久化儲存 SQLite 資料庫
-      - ./data:/app/data
+      # 掛載本機的 ./backend/data 目錄以持久化儲存 SQLite 資料庫
+      - ./backend/data:/app/data
       # 掛載登入所需的設定檔。gemini-cli 預設儲存於 ~/.gemini 目錄
       # 將其掛載到本機，使得重新建立 container 不會遺失登入狀態
       - ./gemini-config:/root/.gemini

@@ -12,6 +12,7 @@ import { SessionRepository } from "../repositories/sessionRepository";
 import crypto from "node:crypto";
 
 export default async function ChatCompletions(context: Context) {
+    const startTime = performance.now();
     const body = await context.req.json();
     const result = ChatCompletionSchema.safeParse(body);
 
@@ -62,10 +63,14 @@ export default async function ChatCompletions(context: Context) {
 
     const geminiArg = new GeminiArgument(prompt, modelName);
     const commandArgs = await geminiArg.toCommand();
+    
+    const spawnStart = performance.now();
     const proc = Bun.spawn(commandArgs, {
         stdout: "pipe",
         stderr: "pipe"
     });
+    const spawnDuration = (performance.now() - spawnStart).toFixed(2);
+    console.log(`[Perf] Process spawned: ${spawnDuration}ms`);
 
     // 監聽連線中斷，主動殺掉進程
     context.req.raw.signal.addEventListener('abort', () => {
@@ -81,7 +86,7 @@ export default async function ChatCompletions(context: Context) {
     if (!isStream) {
         try {
             const content = proc.stdout
-                ? await collectStreamedContent(proc.stdout)
+                ? await collectStreamedContent(proc.stdout, startTime)
                 : '';
 
             await proc.exited;
@@ -129,9 +134,9 @@ export default async function ChatCompletions(context: Context) {
         try {
             if (proc.stdout) {
                 if (hasTools) {
-                    fullAiContent = await handleToolStream(proc.stdout, s, modelName);
+                    fullAiContent = await handleToolStream(proc.stdout, s, modelName, startTime);
                 } else {
-                    fullAiContent = await handleTextStream(proc.stdout, s, modelName);
+                    fullAiContent = await handleTextStream(proc.stdout, s, modelName, startTime);
                 }
             }
 
