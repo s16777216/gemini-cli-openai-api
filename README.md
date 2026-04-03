@@ -89,29 +89,29 @@ npm run start:node # 執行編譯後的版本
 
 ## Docker 部署
 
-我們提供 `Dockerfile` 與 `docker-compose.yml` 方便直接佈署於容器環境中，這將自動處理系統依賴與字元編碼，並享有全作業系統相容性。
+我們提供 `Dockerfile` 與 `docker-compose.yml` 方便直接部署於容器環境中。本專案採用 **多階段構建 (Multi-stage Build)**，會自動在容器內完成「前端編譯」與「後端整合」，確保環境一致性且無需在主機安裝任何開發工具。
 
 ### 1. 啟動準備
 
 請確保系統中已安裝 [Docker](https://docs.docker.com/get-docker/) 與 Docker Compose。
 
-### 2. 初始化 Gemini 登入
+### 2. 編譯並啟動 (首次執行)
 
-由於 `gemini-cli` 使用 OAuth 驗證，你需要**第一次進入容器內**完成登入，未來即可透過 volume `/root/.gemini` 重複使用登入態：
+在專案根目錄執行以下指令，系統會自動編譯前端並啟動後端：
+
+```bash
+docker-compose up -d --build
+```
+
+### 3. 初始化 Gemini 登入
+
+由於 `gemini-cli` 使用 OAuth 驗證，你需要**第一次啟動後**完成登入。這會將驗證資訊存入 `./gemini-config` 目錄，未來重新啟動容器時無需再次登入：
 
 ```bash
 docker-compose run --rm gemini-proxy gemini
 ```
 
-終端機將出現一段 Google 登入網址，請複製至瀏覽器完成授權。授權成功後，你可以按下 `Ctrl+C` 離開。
-
-### 3. 背景啟動服務
-
-完成登入後，以背景模式啟動代理伺服器：
-
-```bash
-docker-compose up -d
-```
+終端機將出現一段 Google 登入網址，請複製至瀏覽器完成授權。授權成功後，你可以按下 `Ctrl+C` 離開。之後服務即可正常運作。
 
 伺服器將執行於 http://localhost:3002。
 所有的 SQLite 資料會被存入 `./data/` 目錄中以確保持久化。
