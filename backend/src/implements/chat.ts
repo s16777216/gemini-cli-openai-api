@@ -59,10 +59,23 @@ export default async function ChatCompletions(context: Context) {
     const flatText = flattenMessages(messages as Message[]);
     const prompt = hasTools ? buildPromptWithTools(flatText, tools) : flatText;
 
-    logger.info('Incoming request', { requestId, stream: isStream, promptLen: prompt.length, tools: hasTools ? tools.length : 0, model: modelName, sessionId });
-
     const geminiArg = new GeminiArgument(prompt, modelName);
-    const commandArgs = ["node", config.geminiCliPath, ...geminiArg.toArgs()];
+    let commandArgs: string[] = [];
+
+    if (config.geminiCliPath.startsWith("npx")) {
+        // 處理 npx 指令模式
+        const parts = config.geminiCliPath.split(" ");
+        const bin = await Bun.which(parts[0] || "npx");
+        if (bin) {
+            parts[0] = bin;
+        }
+        commandArgs = [...parts, ...geminiArg.toArgs()];
+    } else {
+        // 處理直接腳本路徑模式
+        commandArgs = ["node", config.geminiCliPath, ...geminiArg.toArgs()];
+    }
+    
+    logger.info('Incoming request', { requestId, stream: isStream, promptLen: prompt.length, tools: hasTools ? tools.length : 0, model: modelName, sessionId });
     
     const spawnStart = performance.now();
     const proc = Bun.spawn(commandArgs, {
