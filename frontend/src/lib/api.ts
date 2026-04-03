@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
-import type { Session, ApiKey, ApiResponse, SuccessResponse } from '../types/api'
+import type { Session, ApiKey, ApiResponse, SuccessResponse, Model } from '../types/api'
 
 const api = axios.create({
   baseURL: '/v1',
@@ -43,5 +43,10 @@ export const deleteSession = (id: string) => api.delete<SuccessResponse>(`/sessi
 export const getApiKeys = () => api.get<ApiResponse<ApiKey[]>>('/admin/keys')
 export const createApiKey = (label: string) => api.post<ApiResponse<ApiKey>>('/admin/keys', { label })
 export const revokeApiKey = (id: string) => api.delete<SuccessResponse>(`/admin/keys/${id}`)
+
+/**
+ * Model API
+ */
+export const getModels = () => api.get<ApiResponse<Model[]>>('/models')
 
 export default api

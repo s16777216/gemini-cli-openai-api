@@ -5,14 +5,22 @@ import { Card } from '@/components/ui/card'
 import {
   Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus
 } from 'lucide-vue-next'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 // AI SDK and state
 import { Chat } from '@ai-sdk/vue'
 import { OpenAIChatTransport } from '@/lib/openai-transport'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
-import { getSessions, getSession, deleteSession as apiDeleteSession } from '@/lib/api'
-import type { Session } from '@/types/api'
+import { getSessions, getSession, deleteSession as apiDeleteSession, getModels } from '@/lib/api'
+import type { Session, Model } from '@/types/api'
 import ApiKeyManager from '@/components/ApiKeyManager.vue'
 import RadixAlertDialog from '@/components/RadixAlertDialog.vue'
 import { useToastStore } from '@/stores/toast'
@@ -27,6 +35,8 @@ const sessions = ref<Session[]>([])
 const currentSessionId = ref<string | null>(null)
 const isKeyModalOpen = ref(false)
 const isHistoryLoading = ref(false)
+const allModels = ref<Model[]>([])
+const selectedModel = ref('gemini-2.5-flash')
 
 // 刪除確認狀態
 const isDeleteDialogOpen = ref(false)
@@ -40,7 +50,7 @@ const chat = new Chat({
       'Authorization': `Bearer ${authStore.token}`
     },
     body: {
-      model: 'gemini-2.5-flash',
+      model: computed(() => selectedModel.value),
       sessionId: computed(() => currentSessionId.value)
     },
     onFinish: () => {
@@ -59,6 +69,19 @@ const fetchSessions = async () => {
     sessions.value = res.data.data
   } catch (err) {
     console.error('Failed to fetch sessions:', err)
+  }
+}
+
+const fetchModels = async () => {
+  try {
+    const res = await getModels()
+    allModels.value = res.data.data
+    // 如果目前選擇的模型不在清單中，設為第一個
+    if (allModels.value.length > 0 && !allModels.value.find(m => m.id === selectedModel.value)) {
+      selectedModel.value = allModels.value[0].id
+    }
+  } catch (err) {
+    console.error('Failed to fetch models:', err)
   }
 }
 
@@ -153,6 +176,7 @@ const formatDate = (ts: number) => {
 
 onMounted(() => {
   fetchSessions()
+  fetchModels()
 })
 
 // Handle Enter key for submission
@@ -176,6 +200,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
       </div>
 
       <nav class="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+
+
         <Button @click="startNewChat" variant="ghost"
           class="w-full justify-start gap-3 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl transition-all mb-6 py-6 border border-primary/20">
           <Plus class="w-5 h-5" />
@@ -294,32 +320,54 @@ const handleKeyDown = (e: KeyboardEvent) => {
       <div class="p-6 md:p-10 pt-0 max-w-5xl mx-auto w-full">
         <form @submit="handleSubmit" class="relative">
           <Card
-            class="bg-card border-border border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xl group">
-            <div class="flex items-end p-4 gap-2">
-              <Button type="button" variant="ghost" size="icon"
-                class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground">
-                <Paperclip class="w-5 h-5" />
-              </Button>
-
+            class="bg-card border-border border rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-2xl group pb-2">
+            <div class="flex flex-col">
               <textarea v-model="input" rows="1" placeholder="與 Gemini 對話..."
-                class="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-base py-2.5 resize-none max-h-60 custom-scrollbar outline-none placeholder:text-muted-foreground"
+                class="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-base px-5 py-4 resize-none max-h-60 custom-scrollbar outline-none placeholder:text-muted-foreground/50"
                 @keydown="handleKeyDown"></textarea>
 
-              <div class="flex items-center gap-2">
-                <Button type="button" variant="ghost" size="icon"
-                  class="rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hidden md:flex">
-                  <Mic class="w-5 h-5" />
-                </Button>
-                <Button type="submit" size="icon"
-                  class="rounded-md h-10 w-10 bg-primary text-primary-foreground shadow-sm active:scale-95 transition-all disabled:opacity-50"
-                  :disabled="!input.trim() || isLoading">
-                  <div class="flex items-center justify-center">
-                    <Send class="w-4 h-4" v-if="!isLoading" />
-                    <div
-                      class="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"
-                      v-else></div>
-                  </div>
-                </Button>
+              <div class="flex items-center justify-between px-4 py-2 border-t border-border/30">
+                <div class="flex items-center gap-1.5">
+                  <Button type="button" variant="ghost" size="icon"
+                    class="rounded-lg h-9 w-9 text-muted-foreground/60 hover:text-foreground">
+                    <Paperclip class="w-4.5 h-4.5" />
+                  </Button>
+                  
+                  <Select v-model="selectedModel">
+                    <SelectTrigger class="h-8 w-fit bg-muted/40 border-none hover:bg-accent hover:text-primary transition-all rounded-full px-3 gap-2 text-[11px] font-bold text-muted-foreground ring-0 focus:ring-0 focus:ring-offset-0">
+                      <Sparkles class="w-3 h-3 text-primary" />
+                      <SelectValue placeholder="選擇模型" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem v-for="m in allModels" :key="m.id" :value="m.id">
+                          <div class="flex items-center gap-2 py-1">
+                            <span class="text-[10px] text-muted-foreground/50 uppercase font-bold tracking-widest">{{ m.owned_by }}</span>
+                            <span class="text-muted-foreground/30 text-xs">/</span>
+                            <span class="font-bold text-sm tracking-tight">{{ m.id }}</span>
+                          </div>
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <Button type="button" variant="ghost" size="icon"
+                    class="rounded-lg h-9 w-9 text-muted-foreground/60 hover:text-foreground hidden md:flex">
+                    <Mic class="w-4.5 h-4.5" />
+                  </Button>
+                  <Button type="submit" size="icon"
+                    class="rounded-xl h-9 w-9 bg-primary text-primary-foreground shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                    :disabled="!input.trim() || isLoading">
+                    <div class="flex items-center justify-center">
+                      <Send class="w-4 h-4" v-if="!isLoading" />
+                      <div
+                        class="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"
+                        v-else></div>
+                    </div>
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>
