@@ -3,7 +3,7 @@ import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
-  Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus
+  Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus, Square
 } from 'lucide-vue-next'
 import MarkdownMessage from '@/components/MarkdownMessage.vue'
 import {
@@ -304,16 +304,34 @@ const handleKeyDown = (e: KeyboardEvent) => {
               :class="msg.role === 'assistant' ? 'text-foreground' : 'bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-tr-none inline-block text-left shadow-sm whitespace-pre-wrap'">
               <template v-for="(part, pIdx) in msg.parts" :key="pIdx">
                 <template v-if="part.type === 'text'">
-                  <MarkdownMessage v-if="msg.role === 'assistant'" :content="part.text" />
+                  <MarkdownMessage v-if="msg.role === 'assistant'" :content="part.text" :isLoading="isLoading && idx === chat.messages.length - 1" />
                   <span v-else>{{ part.text }}</span>
                 </template>
               </template>
-              <div v-if="(msg.parts.length === 0 || (isLoading && idx === chat.messages.length - 1 && msg.role === 'assistant' && !msg.parts.some(p => p.type === 'text')))"
-                class="flex gap-1.5 py-2">
-                <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-75"></div>
-                <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-150"></div>
-                <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-300"></div>
-              </div>
+              <!-- 當助理訊息還沒有任何文字內容，且正在載入時，直接顯示思考狀態 -->
+              <MarkdownMessage 
+                v-if="msg.role === 'assistant' && isLoading && idx === chat.messages.length - 1 && !msg.parts.some(p => p.type === 'text' && p.text?.trim())" 
+                content="" 
+                :isLoading="true" 
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 幽靈訊息：當正在載入且最後一則訊息是使用者發送時，顯示思考狀態 -->
+        <div v-if="isLoading && chat.messages.length > 0 && chat.messages[chat.messages.length - 1].role === 'user'"
+          class="flex gap-4 md:gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div class="w-9 h-9 md:w-10 md:h-10 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md bg-primary">
+            <Bot class="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
+          </div>
+          <div class="flex-1 space-y-2">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                Gemini Pro
+              </span>
+            </div>
+            <div class="prose prose-invert max-w-none text-sm md:text-base leading-relaxed text-foreground">
+              <MarkdownMessage content="" :isLoading="true" />
             </div>
           </div>
         </div>
@@ -360,14 +378,18 @@ const handleKeyDown = (e: KeyboardEvent) => {
                     class="rounded-lg h-9 w-9 text-muted-foreground/60 hover:text-foreground hidden md:flex">
                     <Mic class="w-4.5 h-4.5" />
                   </Button>
-                  <Button type="submit" size="icon"
-                    class="rounded-xl h-9 w-9 bg-primary text-primary-foreground shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
-                    :disabled="!input.trim() || isLoading">
+                  <Button v-if="isLoading" type="button" size="icon" variant="ghost"
+                    class="rounded-xl h-9 w-9 text-destructive hover:bg-destructive/10 transition-all border border-destructive/20"
+                    @click="chat.stop()">
                     <div class="flex items-center justify-center">
-                      <Send class="w-4 h-4" v-if="!isLoading" />
-                      <div
-                        class="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"
-                        v-else></div>
+                      <Square class="w-3.5 h-3.5 fill-current" />
+                    </div>
+                  </Button>
+                  <Button v-else type="submit" size="icon"
+                    class="rounded-xl h-9 w-9 bg-primary text-primary-foreground shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                    :disabled="!input.trim()">
+                    <div class="flex items-center justify-center">
+                      <Send class="w-4 h-4" />
                     </div>
                   </Button>
                 </div>

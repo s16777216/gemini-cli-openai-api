@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
+import { Sparkles } from 'lucide-vue-next'
 import { renderMarkdown, initMarkdown } from '@/lib/markdown'
 import 'github-markdown-css/github-markdown-dark.css'
 
 const props = defineProps<{
   content: string
+  isLoading?: boolean
 }>()
 
 const renderedHtml = ref('')
@@ -28,11 +30,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="markdown-body !bg-transparent !p-0 !text-inherit" v-html="renderedHtml"></div>
-  <div v-if="isInitializing && !renderedHtml" class="flex gap-1.5 py-2">
-    <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-75"></div>
-    <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-150"></div>
-    <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-300"></div>
+  <div v-if="content?.trim()" class="markdown-body !bg-transparent !p-0 !text-inherit relative" 
+    :class="{ 'is-streaming': isLoading }"
+    v-html="renderedHtml"></div>
+  <div v-else-if="isLoading" class="flex items-center gap-2 py-2 text-muted-foreground/60 italic text-sm animate-pulse select-none">
+    <Sparkles class="w-3.5 h-3.5 text-primary/40" />
+    <span>正在思考...</span>
   </div>
 </template>
 
@@ -41,6 +44,23 @@ onMounted(async () => {
 .markdown-body {
   font-family: inherit;
   line-height: 1.6;
+}
+
+/* Streaming Cursor Effect */
+.markdown-body.is-streaming > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: hsl(var(--primary));
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .markdown-body pre {
