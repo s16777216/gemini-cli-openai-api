@@ -188,8 +188,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
             <Clock class="w-8 h-8 mx-auto" />
             <p class="text-xs">尚無歷史對話</p>
           </div>
-          <div v-for="session in sessions" :key="session.id" 
-            @click="loadSession(session.id)"
+          <div v-for="session in sessions" :key="session.id" @click="loadSession(session.id)"
             class="group w-full flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-accent relative"
             :class="currentSessionId === session.id ? 'bg-accent/80 border border-border shadow-sm' : ''">
             <History class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -280,7 +279,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
               </template>
               <span v-if="isLoading && idx === chat.messages.length - 1 && msg.role === 'assistant'"
                 class="inline-block w-2 h-4 bg-primary/80 ml-1 rounded-sm animate-pulse align-middle"></span>
-              <div v-if="msg.parts.length === 0 && isLoading && idx === chat.messages.length - 1" class="flex gap-1.5 py-2">
+              <div v-if="msg.parts.length === 0 && isLoading && idx === chat.messages.length - 1"
+                class="flex gap-1.5 py-2">
                 <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-75"></div>
                 <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-150"></div>
                 <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-300"></div>
@@ -337,14 +337,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
     <ApiKeyManager :isOpen="isKeyModalOpen" @close="isKeyModalOpen = false" />
 
     <!-- 刪除確認彈窗 -->
-    <RadixAlertDialog 
-      v-model:open="isDeleteDialogOpen"
-      title="確認要刪除此對話嗎？"
-      description="此操作將永久刪除該對話紀錄及其所有訊息內容，且無法復原。"
-      actionText="確認刪除"
-      variant="destructive"
-      @action="confirmDeleteChat"
-    />
+    <RadixAlertDialog v-model:open="isDeleteDialogOpen" title="確認要刪除此對話嗎？" description="此操作將永久刪除該對話紀錄及其所有訊息內容，且無法復原。"
+      actionText="確認刪除" variant="destructive" @action="confirmDeleteChat" />
   </div>
 </template>
 

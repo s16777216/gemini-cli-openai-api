@@ -3,8 +3,8 @@ import { ref, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { 
-  X, Plus, Trash2, Copy, CheckCircle2, AlertCircle, Key, Loader2 
+import {
+  X, Plus, Trash2, Copy, CheckCircle2, AlertCircle, Key, Loader2
 } from 'lucide-vue-next'
 import { getApiKeys, createApiKey, revokeApiKey } from '@/lib/api'
 import type { ApiKey } from '@/types/api'
@@ -99,7 +99,8 @@ defineExpose({ fetchKeys })
 
 <template>
   <Teleport to="body">
-    <div v-if="isOpen" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div v-if="isOpen"
+      class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
       <Card class="w-full max-w-2xl bg-card border-border shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         <div class="p-6 border-b border-border flex items-center justify-between bg-muted/20">
           <div class="flex items-center gap-3">
@@ -121,8 +122,7 @@ defineExpose({ fetchKeys })
           <div class="space-y-3">
             <label class="text-xs font-bold uppercase tracking-wider text-muted-foreground">建立新金鑰</label>
             <div class="flex gap-2">
-              <Input v-model="newKeyLabel" placeholder="金鑰標籤 (例如：開發用、測試手機...)" 
-                @keyup.enter="handleAddKey"
+              <Input v-model="newKeyLabel" placeholder="金鑰標籤 (例如：開發用、測試手機...)" @keyup.enter="handleAddKey"
                 class="bg-muted/50 border-border focus-visible:ring-primary/20" />
               <Button @click="handleAddKey" :disabled="!newKeyLabel.trim() || isSubmitting" class="gap-2">
                 <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin" />
@@ -135,25 +135,28 @@ defineExpose({ fetchKeys })
           <!-- Key List -->
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-bold uppercase tracking-wider text-muted-foreground">現有金鑰 ({{ keys.length }})</label>
+              <label class="text-xs font-bold uppercase tracking-wider text-muted-foreground">現有金鑰 ({{ keys.length
+                }})</label>
               <Button variant="ghost" size="sm" @click="fetchKeys" class="text-[10px] h-7 px-2">重新整理</Button>
             </div>
-            
-            <div v-if="isLoading && keys.length === 0" class="py-12 flex flex-col items-center justify-center text-muted-foreground gap-3">
+
+            <div v-if="isLoading && keys.length === 0"
+              class="py-12 flex flex-col items-center justify-center text-muted-foreground gap-3">
               <Loader2 class="w-8 h-8 animate-spin opacity-20" />
               <p class="text-sm">載入中...</p>
             </div>
 
-            <div v-else-if="keys.length === 0" class="py-12 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground gap-3">
+            <div v-else-if="keys.length === 0"
+              class="py-12 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground gap-3">
               <AlertCircle class="w-8 h-8 opacity-20" />
               <p class="text-sm">目前沒有任何 API Key</p>
             </div>
 
             <div v-else class="space-y-3">
-              <div v-for="key in keys" :key="key.id" 
+              <div v-for="key in keys" :key="key.id"
                 class="group p-4 bg-muted/30 hover:bg-muted/50 border border-border rounded-xl transition-all relative overflow-hidden"
                 :class="key.status === 'revoked' ? 'opacity-60 grayscale' : ''">
-                
+
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
                     <span class="font-bold text-sm">{{ key.label }}</span>
@@ -162,21 +165,24 @@ defineExpose({ fetchKeys })
                       {{ key.status === 'active' ? '使用中' : '已撤銷' }}
                     </span>
                   </div>
-                  <Button v-if="key.status === 'active'" @click="handleRevokeKey(key.id)" 
-                    variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-destructive rounded-lg">
+                  <Button v-if="key.status === 'active'" @click="handleRevokeKey(key.id)" variant="ghost" size="icon"
+                    class="h-8 w-8 text-muted-foreground hover:text-destructive rounded-lg">
                     <Trash2 class="w-4 h-4" />
                   </Button>
                 </div>
 
-                <div class="flex items-center gap-2 bg-background/50 p-2.5 rounded-lg border border-border border-dashed font-mono text-xs overflow-hidden group-hover:border-primary/30 transition-colors">
+                <div
+                  class="flex items-center gap-2 bg-background/50 p-2.5 rounded-lg border border-border border-dashed font-mono text-xs overflow-hidden group-hover:border-primary/30 transition-colors">
                   <span class="truncate flex-1 opacity-70">{{ key.token }}</span>
-                  <Button @click="copyToClipboard(key.token, key.id)" variant="ghost" size="icon" class="h-7 w-7 rounded-md">
+                  <Button @click="copyToClipboard(key.token, key.id)" variant="ghost" size="icon"
+                    class="h-7 w-7 rounded-md">
                     <CheckCircle2 v-if="copiedId === key.id" class="w-3.5 h-3.5 text-green-500" />
                     <Copy v-else class="w-3.5 h-3.5" />
                   </Button>
                 </div>
-                
-                <p class="mt-2 text-[10px] text-muted-foreground/60 tracking-tight">建立於：{{ formatDate(key.createdAt) }}</p>
+
+                <p class="mt-2 text-[10px] text-muted-foreground/60 tracking-tight">建立於：{{ formatDate(key.createdAt) }}
+                </p>
               </div>
             </div>
           </div>
@@ -190,12 +196,7 @@ defineExpose({ fetchKeys })
   </Teleport>
 
   <!-- 撤銷確認彈窗 -->
-  <RadixAlertDialog 
-    v-model:open="isRevokeDialogOpen"
-    title="確定要撤銷此 API Key 嗎？"
-    description="撤銷後，使用該金鑰的應用程式將立即無法訪問代理伺服器。此操作不可逆。"
-    actionText="確認撤銷"
-    variant="destructive"
-    @action="confirmRevokeKey"
-  />
+  <RadixAlertDialog v-model:open="isRevokeDialogOpen" title="確定要撤銷此 API Key 嗎？"
+    description="撤銷後，使用該金鑰的應用程式將立即無法訪問代理伺服器。此操作不可逆。" actionText="確認撤銷" variant="destructive"
+    @action="confirmRevokeKey" />
 </template>

@@ -25,7 +25,7 @@ export class OpenAIChatTransport<UI_MESSAGE extends UIMessage> extends HttpChatT
             stream: true, // 強制開啟串流模式
             messages: params.messages.map((m: any) => ({
               role: m.role,
-              content: m.parts 
+              content: m.parts
                 ? m.parts.map((p: any) => (p.type === 'text' ? p.text : '')).join('')
                 : m.content || '',
             })),
@@ -63,7 +63,7 @@ export class OpenAIChatTransport<UI_MESSAGE extends UIMessage> extends HttpChatT
               const trimmed = line.trim();
               if (trimmed.startsWith('data: ')) {
                 const data = trimmed.slice(6);
-                
+
                 // 處理 [DONE] 結束標記
                 if (data === '[DONE]') {
                   if (hasStarted) {
@@ -72,11 +72,11 @@ export class OpenAIChatTransport<UI_MESSAGE extends UIMessage> extends HttpChatT
                   }
                   continue;
                 }
-                
+
                 try {
                   const json = JSON.parse(data);
                   const content = json.choices?.[0]?.delta?.content;
-                  
+
                   // 初始化訊息狀態
                   if (!hasStarted && (content || json.id)) {
                     messageId = json.id || `msg-${Date.now()}`;
@@ -86,19 +86,19 @@ export class OpenAIChatTransport<UI_MESSAGE extends UIMessage> extends HttpChatT
                   }
 
                   if (content) {
-                    controller.enqueue({ 
-                      type: 'text-delta', 
-                      id: messageId, 
-                      delta: content 
+                    controller.enqueue({
+                      type: 'text-delta',
+                      id: messageId,
+                      delta: content
                     });
                   }
-                  
+
                   const finishReason = json.choices?.[0]?.finish_reason;
                   if (finishReason) {
                     controller.enqueue({ type: 'text-end', id: messageId });
-                    controller.enqueue({ 
-                      type: 'finish', 
-                      finishReason: (finishReason === 'stop' ? 'stop' : 'other') as any 
+                    controller.enqueue({
+                      type: 'finish',
+                      finishReason: (finishReason === 'stop' ? 'stop' : 'other') as any
                     });
                   }
                 } catch (e) {
