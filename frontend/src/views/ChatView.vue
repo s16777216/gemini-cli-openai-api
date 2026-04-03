@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import {
   Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus
 } from 'lucide-vue-next'
+import MarkdownMessage from '@/components/MarkdownMessage.vue'
 import {
   Select,
   SelectContent,
@@ -50,8 +51,8 @@ const chat = new Chat({
       'Authorization': `Bearer ${authStore.token}`
     },
     body: {
-      model: computed(() => selectedModel.value),
-      sessionId: computed(() => currentSessionId.value)
+      model: selectedModel.value,
+      sessionId: currentSessionId.value
     },
     onFinish: () => {
       // 串流結束後重新獲取列表，以獲取自動產生的標題
@@ -160,7 +161,10 @@ const handleSubmit = (e?: Event) => {
   if (!input.value.trim() || isLoading.value) return
 
   chat.sendMessage({ text: input.value }, {
-    body: { sessionId: currentSessionId.value }
+    body: { 
+      sessionId: currentSessionId.value,
+      model: selectedModel.value
+    }
   })
   input.value = ''
 }
@@ -296,20 +300,19 @@ const handleKeyDown = (e: KeyboardEvent) => {
                 {{ msg.role === 'assistant' ? 'Gemini Pro' : 'You' }}
               </span>
             </div>
-            <div class="prose prose-invert max-w-none text-sm md:text-base leading-relaxed whitespace-pre-wrap"
-              :class="msg.role === 'assistant' ? 'text-foreground' : 'bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-tr-none inline-block text-left shadow-sm'">
+            <div class="prose prose-invert max-w-none text-sm md:text-base leading-relaxed"
+              :class="msg.role === 'assistant' ? 'text-foreground' : 'bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-tr-none inline-block text-left shadow-sm whitespace-pre-wrap'">
               <template v-for="(part, pIdx) in msg.parts" :key="pIdx">
                 <template v-if="part.type === 'text'">
-                  {{ part.text }}
+                  <MarkdownMessage v-if="msg.role === 'assistant'" :content="part.text" />
+                  <span v-else>{{ part.text }}</span>
                 </template>
               </template>
-              <span v-if="isLoading && idx === chat.messages.length - 1 && msg.role === 'assistant'"
-                class="inline-block w-2 h-4 bg-primary/80 ml-1 rounded-sm animate-pulse align-middle"></span>
-              <div v-if="msg.parts.length === 0 && isLoading && idx === chat.messages.length - 1"
+              <div v-if="(msg.parts.length === 0 || (isLoading && idx === chat.messages.length - 1 && msg.role === 'assistant' && !msg.parts.some(p => p.type === 'text')))"
                 class="flex gap-1.5 py-2">
-                <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-75"></div>
-                <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-150"></div>
-                <div class="w-2 h-2 rounded-full bg-primary/40 animate-bounce delay-300"></div>
+                <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-75"></div>
+                <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-150"></div>
+                <div class="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce delay-300"></div>
               </div>
             </div>
           </div>
