@@ -44,7 +44,7 @@ describe("flattenMessages", () => {
             }]
         }];
         const result = flattenMessages(messages);
-        expect(result).toContain("called: write(");
+        expect(result).toContain('{"name":"write","arguments":{"filePath":"/a.md","content":"hi"}}');
         expect(result).toContain("<assistant>");
     });
 
@@ -62,8 +62,7 @@ describe("flattenMessages", () => {
     test("content 為 null 時不崩潰", () => {
         const messages: Message[] = [{ role: "assistant", content: null }];
         const result = flattenMessages(messages);
-        expect(result).toContain("<assistant>");
-        expect(result).toContain("</assistant>");
+        expect(result).toBe("");
     });
 
     test("system 在混合訊息中排在最前", () => {
@@ -75,7 +74,7 @@ describe("flattenMessages", () => {
         expect(result.indexOf("<system>")).toBeLessThan(result.indexOf("<user>"));
     });
 
-    test("長 tool call arguments 超過限制時截斷", () => {
+    test("長 tool call arguments 不再被截斷", () => {
         const longArgs = JSON.stringify({ content: "x".repeat(1000) });
         const messages: Message[] = [{
             role: "assistant",
@@ -83,7 +82,8 @@ describe("flattenMessages", () => {
             tool_calls: [{ function: { name: "write", arguments: longArgs } }]
         }];
         const result = flattenMessages(messages);
-        expect(result).toContain("[省略");
+        expect(result).not.toContain("[省略");
+        expect(result).toContain("x".repeat(1000));
     });
 });
 
@@ -110,7 +110,7 @@ describe("buildPromptWithTools", () => {
 
     test("有 tools 時會加入工具說明前綴", () => {
         const result = buildPromptWithTools("<user>\nhello\n</user>", [fakeTool]);
-        expect(result).toContain("TOOL_CALL:");
+        expect(result).toContain("<tool_calls>");
         expect(result).toContain("write");
         expect(result).toContain("hello");
     });

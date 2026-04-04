@@ -1,12 +1,5 @@
 import type { Message } from "../schemas/chat";
 
-// ── 常數 ────────────────────────────────────────────────────────────────────
-
-/** tool call arguments 的最大顯示長度（避免大型 file content 膨脹 context） */
-const MAX_ARG_LENGTH = 400;
-/** tool result 的最大顯示長度 */
-const MAX_RESULT_LENGTH = 800;
-
 // ── 工具函式 ─────────────────────────────────────────────────────────────────
 
 function extractTextContent(content: Message['content']): string {
@@ -20,11 +13,6 @@ function extractTextContent(content: Message['content']): string {
     return '';
 }
 
-function trimIfLong(text: string, max: number): string {
-    if (text.length <= max) return text;
-    return text.slice(0, max) + `\n...[省略 ${text.length - max} 字元]`;
-}
-
 // ── 主要匯出 ─────────────────────────────────────────────────────────────────
 
 /**
@@ -33,7 +21,7 @@ function trimIfLong(text: string, max: number): string {
  * 設計原則：
  * 1. system 訊息獨立放在最上方
  * 2. 其餘對話使用 XML-like 標籤，讓 gemini 更容易理解角色切換
- * 3. Tool call arguments 過長時截斷，避免 context 膨脹
+ * 3. 完整保留 Tool call 紀錄，維持 Context 記憶
  */
 export function flattenMessages(messages: Message[]): string {
     const parts: string[] = [];
@@ -53,19 +41,21 @@ export function flattenMessages(messages: Message[]): string {
         // tool 結果訊息
         if (m.role === 'tool') {
             const raw = extractTextContent(m.content) || JSON.stringify(m.content);
-            const trimmed = trimIfLong(raw, MAX_RESULT_LENGTH);
-            parts.push(`<tool_result>\n${trimmed}\n</tool_result>`);
+            parts.push(`<tool_result>\n${raw}\n</tool_result>`);
             continue;
         }
 
         // assistant 含有 tool_calls
         if (m.role === 'assistant' && m.tool_calls?.length) {
-            const callsStr = m.tool_calls.map(tc => {
+            const callsListStr = m.tool_calls.map(tc => {
                 const name = tc.function?.name ?? 'unknown';
-                const rawArgs = tc.function?.arguments ?? '{}';
-                const args = trimIfLong(rawArgs, MAX_ARG_LENGTH);
-                return `  called: ${name}(${args})`;
-            }).join('\n');
+                const argsStr = typeof tc.function?.arguments === 'string'
+                    ? tc.function.arguments || '{}'
+                    : JSON.stringify(tc.function?.arguments ?? {});
+                return `{"name":"${name}","arguments":${argsStr}}`;
+            }).join(', ');
+            const callsStr = `<tool_calls>[${callsListStr}]</tool_calls>`;
+            
             const textContent = extractTextContent(m.content);
             const body = textContent ? `${textContent}\n${callsStr}` : callsStr;
             parts.push(`<assistant>\n${body}\n</assistant>`);
@@ -74,13 +64,15 @@ export function flattenMessages(messages: Message[]): string {
 
         // 一般 user / assistant 訊息
         const content = extractTextContent(m.content);
-        parts.push(`<${m.role}>\n${content}\n</${m.role}>`);
+        if (content) {
+            parts.push(`<${m.role}>\n${content}\n</${m.role}>`);
+        }
     }
 
     return parts.join('\n\n');
 }
 
-/** 將 OpenAI tools 定義注入系統提示，指示 gemini 使用 TOOL_CALL: 格式 */
+/** 將 OpenAI tools 定義注入系統提示，指示 gemini 使用 <tool_calls> 陣列格式 */
 export function buildPromptWithTools(flatMessages: string, tools: any[]): string {
     if (!tools || tools.length === 0) return flatMessages;
 
@@ -100,23 +92,22 @@ export function buildPromptWithTools(flatMessages: string, tools: any[]): string
 IMPORTANT: Do NOT use any built-in tool calling, function calling, or code execution systems.
 Do NOT attempt to execute any file operations or shell commands through any internal mechanism.
 
-You have been given a task. If completing it requires performing an action (such as creating a file,
-running a command, or searching for files), you MUST communicate that action by including a TOOL_CALL
-line as plain text in your response.
+You have been given a task. If completing it requires performing one or more actions (such as creating files, running commands, reading files etc.), you MUST request those actions by outputting a JSON array wrapped in <tool_calls> tags at the VERY END of your response.
 
-Format for requesting an action (output this as plain text, do not call any functions):
-TOOL_CALL:{"name":"<action_name>","arguments":<json_object_with_parameters>}
+Format for requesting actions (output this as plain text, do not call any functions natively):
+<tool_calls>[{"name":"<action_name>","arguments":<json_object_with_parameters>}, ...]</tool_calls>
 
 Available actions:
 ${toolDescriptions}
 
 Rules:
-- When you want to perform an action: output ONLY that TOOL_CALL line, nothing else.
-- When you want to write a file: TOOL_CALL:{"name":"write","arguments":{"filePath":"/absolute/path","content":"full file content"}}
-- When you want to run a shell command: TOOL_CALL:{"name":"bash","arguments":{"command":"the command","description":"what it does"}}
-- When you want to read a file: TOOL_CALL:{"name":"read","arguments":{"filePath":"/absolute/path"}}
-- After a tool result is given back to you, continue with the next action or final response.
-- If no action is needed, just respond with your answer as normal text.
+- You can explain your thoughts first, then output the <tool_calls> block at the end.
+- You can request multiple actions at once by putting multiple objects in the array.
+- When you want to write a file: <tool_calls>[{"name":"write","arguments":{"filePath":"...","content":"..."}}]</tool_calls>
+- When you want to run a shell command: <tool_calls>[{"name":"bash","arguments":{"command":"...","description":"..."}}]</tool_calls>
+- When you want to read a file: <tool_calls>[{"name":"read","arguments":{"filePath":"..."}}]</tool_calls>
+- After a tool result is given back to you, continue with the next action or provide your final reasoning.
+- If no action is needed, just respond with your answer normally and do NOT output <tool_calls>.
 === END FORMAT INSTRUCTIONS ===
 
 `;

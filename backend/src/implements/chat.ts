@@ -4,8 +4,8 @@ import { stream } from "hono/streaming";
 import { ChatCompletionSchema, type Message } from "../schemas/chat";
 import { GeminiArgument } from "../services/gemini";
 import { flattenMessages, buildPromptWithTools } from "../utils/promptBuilder";
-import { handleToolStream, handleTextStream, pipeStderr, collectStreamedContent } from "../utils/chatStream";
-import { buildNonStreamResponse, buildToolCallNonStreamResponse, TOOL_CALL_PREFIX } from "../utils/sseFormatter";
+import { handleStream, pipeStderr, collectStreamedContent } from "../utils/chatStream";
+import { buildNonStreamResponse, buildToolCallNonStreamResponse } from "../utils/sseFormatter";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { SessionRepository } from "../repositories/sessionRepository";
@@ -132,10 +132,23 @@ export default async function ChatCompletions(context: Context) {
                 throw new HTTPException(502, { message: "Gemini returned an empty response. Please try again." });
             }
 
-            const toolCallIndex = content.indexOf(TOOL_CALL_PREFIX);
-            const response = hasTools && toolCallIndex !== -1
-                ? context.json(buildToolCallNonStreamResponse(content.slice(toolCallIndex), modelName))
-                : context.json(buildNonStreamResponse(content, modelName));
+            const startTag = '<tool_calls>';
+            const endTag = '</tool_calls>';
+            const toolCallIndex = content.indexOf(startTag);
+            
+            let response;
+            if (hasTools && toolCallIndex !== -1) {
+                const endIndex = content.lastIndexOf(endTag);
+                let jsonStr = '';
+                if (endIndex !== -1 && endIndex > toolCallIndex) {
+                    jsonStr = content.substring(toolCallIndex + startTag.length, endIndex).trim();
+                } else {
+                    jsonStr = content.substring(toolCallIndex + startTag.length).trim();
+                }
+                response = context.json(buildToolCallNonStreamResponse(jsonStr, modelName));
+            } else {
+                response = context.json(buildNonStreamResponse(content, modelName));
+            }
 
             response.headers.set('x-session-id', sessionId);
             return response;
@@ -157,11 +170,7 @@ export default async function ChatCompletions(context: Context) {
         let fullAiContent = '';
         try {
             if (proc.stdout) {
-                if (hasTools) {
-                    fullAiContent = await handleToolStream(proc.stdout, s, modelName, startTime);
-                } else {
-                    fullAiContent = await handleTextStream(proc.stdout, s, modelName, startTime);
-                }
+                fullAiContent = await handleStream(proc.stdout, s, modelName, startTime, hasTools);
             }
 
             await proc.exited;

@@ -1,20 +1,11 @@
-import { toSSEChunk, sendToolCallSSE, TOOL_CALL_PREFIX } from "./sseFormatter";
+import { toSSEChunk, sendToolCallSSE } from "./sseFormatter";
 import { logger } from "./logger";
 
-/**
- * 將文字依換行符號切分並過濾掉空白或僅含空白字元的行。
- */
 export function splitLines(text: string): string[] {
     return text.split('\n').map(line => line.trim()).filter(line => line !== '');
 }
 
-/**
- * 將 gemini CLI 的 stderr 輸出轉到 console（過濾憑證提示）。
- * 非同步背景執行，不 await。
- */
-export function pipeStderr(
-    stderr: AsyncIterable<Uint8Array> | null
-) {
+export function pipeStderr(stderr: AsyncIterable<Uint8Array> | null) {
     if (!stderr) return;
     (async () => {
         const decoder = new TextDecoder();
@@ -26,69 +17,27 @@ export function pipeStderr(
     })();
 }
 
-/**
- * 工具模式：緩衝完整回應後判斷是否為 TOOL_CALL，
- * 再以對應的 SSE 格式回傳。回傳累計的純文字內容。
- */
-export async function handleToolStream(
+export async function handleStream(
     stdout: AsyncIterable<Uint8Array>,
     stream: { write: (data: string) => any },
     modelName: string,
-    startTime: number
+    startTime: number,
+    hasTools: boolean
 ): Promise<string> {
     const decoder = new TextDecoder();
     let accumulatedContent = '';
     let buffer = '';
     let firstByte = true;
 
-    for await (const chunk of stdout) {
-        if (firstByte) {
-            const ttfb = (performance.now() - startTime).toFixed(2);
-            console.log(`[Perf] TTFB (Tool Stream): ${ttfb}ms`);
-            firstByte = false;
-        }
-        buffer += decoder.decode(chunk, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 最後一行如果不完整，留在 buffer 中
-
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            try {
-                const event = JSON.parse(trimmed);
-                if (event.type === 'message' && event.role === 'assistant' && event.content) {
-                    accumulatedContent += event.content;
-                } else if (event.type === 'result') {
-                    await flushToolOrText(stream, accumulatedContent.trim(), modelName);
-                }
-            } catch {
-                logger.warn('Stream(Tool): failed to parse JSON', { line: trimmed.slice(0, 100) });
-            }
-        }
-    }
-    const totalDuration = (performance.now() - startTime).toFixed(2);
-    console.log(`[Perf] Tool Stream finished. Total duration: ${totalDuration}ms`);
-    return accumulatedContent.trim();
-}
-
-/**
- * 純文字串流模式：邊收邊送，達到即時串流效果。回傳累計的純文字內容。
- */
-export async function handleTextStream(
-    stdout: AsyncIterable<Uint8Array>,
-    stream: { write: (data: string) => any },
-    modelName: string,
-    startTime: number
-): Promise<string> {
-    const decoder = new TextDecoder();
-    let accumulatedContent = '';
-    let buffer = '';
-    let firstByte = true;
+    let state: 'TEXT' | 'TOOL' = 'TEXT';
+    let streamedLength = 0;
+    const startTag = '<tool_calls>';
+    const endTag = '</tool_calls>';
 
     for await (const chunk of stdout) {
         if (firstByte) {
             const ttfb = (performance.now() - startTime).toFixed(2);
-            console.log(`[Perf] TTFB (Text Stream): ${ttfb}ms`);
+            console.log(`[Perf] TTFB (Stream): ${ttfb}ms`);
             firstByte = false;
         }
         buffer += decoder.decode(chunk, { stream: true });
@@ -102,43 +51,74 @@ export async function handleTextStream(
                 const event = JSON.parse(trimmed);
                 if (event.type === 'message' && event.role === 'assistant' && event.content) {
                     accumulatedContent += event.content;
-                    await stream.write(toSSEChunk(event.content, modelName));
+
+                    if (state === 'TEXT') {
+                        if (!hasTools) {
+                            // 若無工具，直接無腦串流
+                            const newText = accumulatedContent.slice(streamedLength);
+                            await stream.write(toSSEChunk(newText, modelName));
+                            streamedLength = accumulatedContent.length;
+                        } else {
+                            // 滑動視窗解析，避免太早吐出可能的 XML 標籤
+                            const textToAnalyze = accumulatedContent.slice(streamedLength);
+                            let safeLength = textToAnalyze.length;
+
+                            for (let i = 1; i <= startTag.length; i++) {
+                                if (textToAnalyze.endsWith(startTag.slice(0, i))) {
+                                    safeLength = textToAnalyze.length - i;
+                                    break;
+                                }
+                            }
+
+                            const toolIndex = textToAnalyze.indexOf(startTag);
+                            if (toolIndex !== -1) {
+                                const safeText = textToAnalyze.slice(0, toolIndex);
+                                if (safeText) {
+                                    await stream.write(toSSEChunk(safeText, modelName));
+                                }
+                                state = 'TOOL';
+                            } else {
+                                if (safeLength > 0) {
+                                    const safeText = textToAnalyze.slice(0, safeLength);
+                                    await stream.write(toSSEChunk(safeText, modelName));
+                                    streamedLength += safeText.length;
+                                }
+                            }
+                        }
+                    }
                 } else if (event.type === 'result') {
-                    await stream.write(toSSEChunk("", modelName, "stop"));
-                    await stream.write("data: [DONE]\n\n");
+                    if (state === 'TOOL') {
+                        const startIndex = accumulatedContent.indexOf(startTag);
+                        const endIndex = accumulatedContent.lastIndexOf(endTag);
+                        
+                        let jsonStr = '';
+                        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                            jsonStr = accumulatedContent.substring(startIndex + startTag.length, endIndex).trim();
+                        } else if (startIndex !== -1) {
+                            jsonStr = accumulatedContent.substring(startIndex + startTag.length).trim();
+                        }
+                        
+                        await sendToolCallSSE(stream, jsonStr, modelName);
+                    } else {
+                        // 清空任何殘留並關閉連線
+                        if (streamedLength < accumulatedContent.length && state === 'TEXT') {
+                            const remain = accumulatedContent.slice(streamedLength);
+                            await stream.write(toSSEChunk(remain, modelName));
+                        }
+                        await stream.write(toSSEChunk("", modelName, "stop"));
+                        await stream.write("data: [DONE]\n\n");
+                    }
                 }
             } catch {
-                logger.warn('Stream(Text): failed to parse JSON', { line: trimmed.slice(0, 100) });
+                logger.warn('Stream: failed to parse JSON', { line: trimmed.slice(0, 100) });
             }
         }
     }
     const totalDuration = (performance.now() - startTime).toFixed(2);
-    console.log(`[Perf] Text Stream finished. Total duration: ${totalDuration}ms`);
+    console.log(`[Perf] Stream finished. Total duration: ${totalDuration}ms`);
     return accumulatedContent.trim();
 }
 
-/** 決定要發送 tool_call SSE 還是純文字 SSE */
-export async function flushToolOrText(
-    stream: { write: (data: string) => any },
-    fullContent: string,
-    modelName: string
-) {
-    const toolCallIndex = fullContent.indexOf(TOOL_CALL_PREFIX);
-    if (toolCallIndex !== -1) {
-        const toolCallStr = fullContent.slice(toolCallIndex);
-        logger.info('ToolCall detected', { preview: toolCallStr.substring(0, 80) });
-        await sendToolCallSSE(stream, toolCallStr, modelName);
-    } else {
-        if (fullContent) await stream.write(toSSEChunk(fullContent, modelName));
-        await stream.write(toSSEChunk("", modelName, "stop"));
-        await stream.write("data: [DONE]\n\n");
-    }
-}
-
-/**
- * 非串流模式：收集 gemini CLI 的完整回應文字並回傳。
- * 不送任何 SSE，由呼叫端決定如何包裝成 JSON。
- */
 export async function collectStreamedContent(
     stdout: AsyncIterable<Uint8Array>,
     startTime: number
