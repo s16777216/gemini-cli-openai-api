@@ -13,13 +13,21 @@ ApiKeyRepository.getInstance();
 
 app.use('*', logger());
 
-// WebUI 靜態檔案服務
-// 先嘗試服務新版 Vue 前端 (dist)，若不存在則回退到舊版 public
-app.use('/*', serveStatic({ root: '../frontend/dist' }));
-app.use('/*', serveStatic({ root: './public' }));
+// WebUI 靜態檔案服務 (移至 /web)
+app.get('/', (c) => c.redirect('/web'));
 
-app.get('/', serveStatic({ path: '../frontend/dist/index.html' }));
-app.get('/', serveStatic({ path: './public/index.html' }));
+app.use('/web/*', serveStatic({ 
+    root: '../frontend/dist',
+    rewriteRequestPath: (p) => p.replace(/^\/web/, '')
+}));
+app.use('/web/*', serveStatic({ 
+    root: './public',
+    rewriteRequestPath: (p) => p.replace(/^\/web/, '')
+}));
+
+// SPA Routing Fallback (為了解決直接進入 /web/chat 會 404 的問題)
+app.get('/web/*', serveStatic({ path: '../frontend/dist/index.html' }));
+app.get('/web/*', serveStatic({ path: './public/index.html' }));
 
 app.basePath('/v1')
     .post('/admin/login', Implementations.Login) // 登入端點不需驗證
