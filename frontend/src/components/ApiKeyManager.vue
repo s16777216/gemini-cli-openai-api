@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -92,6 +92,10 @@ const formatDate = (ts: number) => {
 
 onMounted(() => {
   if (props.isOpen) fetchKeys()
+})
+
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) fetchKeys()
 })
 
 defineExpose({ fetchKeys })
