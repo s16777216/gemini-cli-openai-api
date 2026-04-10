@@ -4,6 +4,8 @@ import ModelList from "./modelList";
 import { ListKeys, CreateKey, RevokeKey } from "./keys";
 import { Login } from "./admin";
 import { ListSessions, GetSessionHistory, DeleteSession } from "./sessions";
+import { ListUpstreams, CreateUpstream, DeleteUpstream } from "./upstream";
+import { OAuthLogin, OAuthCallback } from "./auth";
 
 interface Implementations {
     ChatCompletions: (c: Context) => Promise<Response>;
@@ -15,6 +17,11 @@ interface Implementations {
     ListSessions: (c: Context) => Promise<Response>;
     GetSessionHistory: (c: Context) => Promise<Response>;
     DeleteSession: (c: Context) => Promise<Response>;
+    ListUpstreams: (c: Context) => Promise<Response>;
+    CreateUpstream: (c: Context) => Promise<Response>;
+    DeleteUpstream: (c: Context) => Promise<Response>;
+    OAuthLogin: (c: Context) => Promise<Response>;
+    OAuthCallback: (c: Context) => Promise<Response>;
 }
 
 const Implementations: Implementations = {
@@ -26,7 +33,12 @@ const Implementations: Implementations = {
     Login,
     ListSessions,
     GetSessionHistory,
-    DeleteSession
+    DeleteSession,
+    ListUpstreams,
+    CreateUpstream,
+    DeleteUpstream,
+    OAuthLogin,
+    OAuthCallback
 };
 
 export default Implementations;

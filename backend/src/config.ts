@@ -15,4 +15,13 @@ export const config = {
     rootPassword: Bun.env.ROOT_PASSWORD || "admin",
     databasePath: Bun.env.DATABASE_PATH || "./data/api_keys.db",
     geminiCliPath: Bun.env.GEMINI_CLI_PATH || "npx --yes @google/gemini-cli",
+    
+    // Google OAuth2 Constants (Official Code Assist Client)
+    googleClientId: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
+    googleClientSecret: "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",
+    googleScopes: [
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+    ]
 } as const;

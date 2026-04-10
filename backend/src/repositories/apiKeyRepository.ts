@@ -46,7 +46,7 @@ export class ApiKeyRepository {
             )
         `);
 
-        // 重新加入：訊息明細表
+        // 訊息明細表
         this.db.run(`
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,6 +55,20 @@ export class ApiKeyRepository {
                 content TEXT,
                 createdAt INTEGER,
                 FOREIGN KEY(sessionId) REFERENCES sessions(id) ON DELETE CASCADE
+            )
+        `);
+
+        // 新增：上游憑證池表 (支援多帳號負載均衡)
+        this.db.run(`
+            CREATE TABLE IF NOT EXISTS upstream_credentials (
+                id TEXT PRIMARY KEY,
+                type TEXT,
+                label TEXT,
+                config TEXT,
+                status TEXT,
+                weight INTEGER DEFAULT 1,
+                lastUsedAt INTEGER,
+                createdAt INTEGER
             )
         `);
     }

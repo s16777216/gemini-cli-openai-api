@@ -30,12 +30,18 @@ app.get('/web/*', serveStatic({ path: '../frontend/dist/index.html' }));
 app.get('/web/*', serveStatic({ path: './public/index.html' }));
 
 app.basePath('/v1')
-    .post('/admin/login', Implementations.Login) // 登入端點不需驗證
+    .post('/admin/login', Implementations.Login)
+    .get('/admin/auth/login', Implementations.OAuthLogin)
+    .get('/admin/auth/callback', Implementations.OAuthCallback)
     .use('*', authMiddleware)
     // 管理端點
     .get('/admin/keys', Implementations.ListKeys)
     .post('/admin/keys', Implementations.CreateKey)
     .delete('/admin/keys/:id', Implementations.RevokeKey)
+    // 上游憑證管理
+    .get('/admin/upstreams', Implementations.ListUpstreams)
+    .post('/admin/upstreams', Implementations.CreateUpstream)
+    .delete('/admin/upstreams/:id', Implementations.DeleteUpstream)
     // 標準 OpenAI 相容端點
     .get('/', (c) => c.text('Gemini CLI Proxy is running!'))
     .get('/models', Implementations.ModelList)

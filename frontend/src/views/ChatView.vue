@@ -3,7 +3,7 @@ import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
-  Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus, Square
+  Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus, Square, Server
 } from 'lucide-vue-next'
 import MarkdownMessage from '@/components/MarkdownMessage.vue'
 import {
@@ -23,6 +23,7 @@ import { useRouter } from 'vue-router'
 import { getSessions, getSession, deleteSession as apiDeleteSession, getModels } from '@/lib/api'
 import type { Session, Model } from '@/types/api'
 import ApiKeyManager from '@/components/ApiKeyManager.vue'
+import UpstreamManager from '@/components/UpstreamManager.vue'
 import RadixAlertDialog from '@/components/RadixAlertDialog.vue'
 import { useToastStore } from '@/stores/toast'
 
@@ -35,6 +36,7 @@ const scrollContainer = ref<HTMLElement | null>(null)
 const sessions = ref<Session[]>([])
 const currentSessionId = ref<string | null>(null)
 const isKeyModalOpen = ref(false)
+const isUpstreamModalOpen = ref(false)
 const isHistoryLoading = ref(false)
 const allModels = ref<Model[]>([])
 const selectedModel = ref('gemini-2.5-flash')
@@ -241,6 +243,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
           API Key 管理
         </Button>
 
+        <Button @click="isUpstreamModalOpen = true" variant="ghost"
+          class="w-full justify-start gap-3 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-all">
+          <Server class="w-4 h-4 text-primary" />
+          上游憑證池
+        </Button>
+
         <div class="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
           <div class="w-9 h-9 rounded-full bg-primary flex items-center justify-center p-0.5">
             <div class="bg-background w-full h-full rounded-full flex items-center justify-center">
@@ -408,6 +416,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
     <!-- API Key Manager Modal -->
     <ApiKeyManager :isOpen="isKeyModalOpen" @close="isKeyModalOpen = false" />
+    <UpstreamManager :isOpen="isUpstreamModalOpen" @close="isUpstreamModalOpen = false" />
 
     <!-- 刪除確認彈窗 -->
     <RadixAlertDialog v-model:open="isDeleteDialogOpen" title="確認要刪除此對話嗎？" description="此操作將永久刪除該對話紀錄及其所有訊息內容，且無法復原。"

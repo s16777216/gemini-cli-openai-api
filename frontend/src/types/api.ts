@@ -29,6 +29,17 @@ export interface Model {
   owned_by: string;
 }
 
+export interface UpstreamCredential {
+  id: string;
+  type: 'api_key' | 'oauth2';
+  label: string;
+  config: string;
+  status: 'active' | 'rate_limited' | 'invalid';
+  weight: number;
+  lastUsedAt?: number;
+  createdAt: number;
+}
+
 export interface ApiResponse<T> {
   data: T;
 }
