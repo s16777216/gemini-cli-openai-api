@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import ChatCompletions from "./chat";
 import ModelList from "./modelList";
 import { ListKeys, CreateKey, RevokeKey } from "./keys";
-import { Login } from "./admin";
+import { Login, GetDashboardStats } from "./admin";
 import { ListSessions, GetSessionHistory, DeleteSession, DeleteAllSessions } from "./sessions";
 import { ListUpstreams, CreateUpstream, DeleteUpstream } from "./upstream";
 import { OAuthLogin, OAuthCallback } from "./auth";
@@ -14,6 +14,7 @@ interface Implementations {
     CreateKey: (c: Context) => Promise<Response>;
     RevokeKey: (c: Context) => Promise<Response>;
     Login: (c: Context) => Promise<Response>;
+    GetDashboardStats: (c: Context) => Promise<Response>;
     ListSessions: (c: Context) => Promise<Response>;
     GetSessionHistory: (c: Context) => Promise<Response>;
     DeleteSession: (c: Context) => Promise<Response>;
@@ -32,6 +33,7 @@ const Implementations: Implementations = {
     CreateKey,
     RevokeKey,
     Login,
+    GetDashboardStats,
     ListSessions,
     DeleteAllSessions,
     GetSessionHistory,

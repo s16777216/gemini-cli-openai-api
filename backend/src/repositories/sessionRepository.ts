@@ -17,6 +17,15 @@ export class SessionRepository {
         return SessionRepository.instance;
     }
 
+    public getStats() {
+        const sessionCount = this.db.query("SELECT COUNT(*) as count FROM sessions").get() as { count: number };
+        const messageCount = this.db.query("SELECT COUNT(*) as count FROM messages").get() as { count: number };
+        return {
+            totalSessions: sessionCount.count,
+            totalMessages: messageCount.count
+        };
+    }
+
     public findAll(limit: number = 20): Session[] {
         const query = this.db.query("SELECT * FROM sessions ORDER BY updatedAt DESC LIMIT ?");
         return query.all(limit) as Session[];

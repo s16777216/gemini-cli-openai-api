@@ -18,6 +18,18 @@ export class UpstreamRepository {
         return UpstreamRepository.instance;
     }
 
+    public getStats() {
+        const query = this.db.query(`
+            SELECT 
+                COUNT(*) as total,
+                COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) as active,
+                COALESCE(SUM(CASE WHEN status = 'rate_limited' THEN 1 ELSE 0 END), 0) as rateLimited,
+                COALESCE(SUM(CASE WHEN status = 'invalid' THEN 1 ELSE 0 END), 0) as invalid
+            FROM upstream_credentials
+        `);
+        return query.get() as { total: number, active: number, rateLimited: number, invalid: number };
+    }
+
     public findAll(): UpstreamCredential[] {
         const query = this.db.query("SELECT * FROM upstream_credentials ORDER BY createdAt DESC");
         return query.all() as UpstreamCredential[];

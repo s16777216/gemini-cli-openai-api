@@ -108,7 +108,7 @@ export class GeminiApiProvider {
         return "unused-project-id"; // Fallback
     }
 
-    public async streamGenerateContent(modelId: string, contents: any[], generationConfig: any = {}): Promise<ReadableStream> {
+    public async streamGenerateContent(modelId: string, contents: any[], generationConfig: any = {}): Promise<{ stream: ReadableStream; status: number }> {
         if (this.authType === 'api_key') {
             return this.streamGenerateContentWithApiKey(modelId, contents, generationConfig);
         } else {
@@ -116,7 +116,7 @@ export class GeminiApiProvider {
         }
     }
 
-    private async streamGenerateContentWithApiKey(modelId: string, contents: any[], generationConfig: any = {}): Promise<ReadableStream> {
+    private async streamGenerateContentWithApiKey(modelId: string, contents: any[], generationConfig: any = {}): Promise<{ stream: ReadableStream; status: number }> {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
         
         const payload = {
@@ -143,24 +143,21 @@ export class GeminiApiProvider {
         if (!response.ok) {
             const errorText = await response.text();
             logger.error("Gemini API Key request failed", { status: response.status, error: errorText });
-            throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+            const error: any = new Error(errorText);
+            error.status = response.status;
+            throw error;
         }
 
         if (!response.body) throw new Error("Gemini API response has no body");
-        return response.body;
+        return { stream: response.body, status: response.status };
     }
 
-    /**
-     * Executes a chat completion request via the Google Code Assist (IDE) API.
-     */
-    private async streamGenerateContentWithOAuth2(modelId: string, contents: any[], generationConfig: any = {}): Promise<ReadableStream> {
+    private async streamGenerateContentWithOAuth2(modelId: string, contents: any[], generationConfig: any = {}): Promise<{ stream: ReadableStream; status: number }> {
         const token = await this.ensureAuth();
         const projectId = await this.discoverProjectId(token);
 
-        // IDE 通道專用 URL (不帶 models/ 模型路徑)
         const url = `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:streamGenerateContent?alt=sse`;
         
-        // IDE 通道專用雙層封裝格式
         const payload = {
             model: modelId,
             project: projectId,
@@ -190,13 +187,15 @@ export class GeminiApiProvider {
         if (!response.ok) {
             const errorText = await response.text();
             logger.error("Gemini API request failed", { status: response.status, error: errorText });
-            throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+            const error: any = new Error(errorText);
+            error.status = response.status;
+            throw error;
         }
 
         if (!response.body) {
             throw new Error("Gemini API response has no body");
         }
 
-        return response.body;
+        return { stream: response.body, status: response.status };
     }
 }

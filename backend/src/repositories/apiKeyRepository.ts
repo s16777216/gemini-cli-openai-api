@@ -72,6 +72,19 @@ export class ApiKeyRepository {
                 createdAt INTEGER
             )
         `);
+        
+        // 新增：請求狀態碼日誌表 (Analytics & Debugging)
+        this.db.run(`
+            CREATE TABLE IF NOT EXISTS request_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                upstreamId TEXT,
+                model TEXT,
+                statusCode INTEGER,
+                latency INTEGER,
+                error TEXT,
+                createdAt INTEGER
+            )
+        `);
 
         // Migration: Add recoveryAt column if doesn't exist (for existing DBs)
         try {

@@ -6,6 +6,7 @@ import { buildNonStreamResponse } from "../utils/sseFormatter";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { SessionRepository } from "../repositories/sessionRepository";
+import { RequestLogRepository } from "../repositories/requestLogRepository";
 import crypto from "node:crypto";
 
 import { LoadBalancerService } from "../services/loadBalancerService";
@@ -73,12 +74,22 @@ export default async function ChatCompletions(context: Context) {
         }
 
         const { provider, credentialId, label } = upstream;
+        const apiRequestStartTime = Date.now();
 
         try {
-            const apiResponseStream = await provider.streamGenerateContent(modelName, contents, {
+            const { stream: apiResponseStream, status: statusCode } = await provider.streamGenerateContent(modelName, contents, {
                 temperature: result.data.temperature,
                 max_tokens: result.data.max_tokens,
                 stop: result.data.stop
+            });
+
+            // 記錄成功日誌
+            RequestLogRepository.getInstance().add({
+                upstreamId: credentialId,
+                model: modelName,
+                statusCode: statusCode,
+                latency: Date.now() - apiRequestStartTime,
+                createdAt: apiRequestStartTime
             });
 
             if (isStream) {
@@ -97,6 +108,18 @@ export default async function ChatCompletions(context: Context) {
             }
         } catch (e: any) {
             const errorResult = parseGoogleError(e.message);
+            const statusCode = e.status || 500;
+            const latency = Date.now() - (typeof apiRequestStartTime !== 'undefined' ? apiRequestStartTime : Date.now());
+
+            // 記錄錯誤日誌
+            RequestLogRepository.getInstance().add({
+                upstreamId: credentialId,
+                model: modelName,
+                statusCode: statusCode,
+                latency: latency,
+                error: errorResult.originalMessage,
+                createdAt: Date.now()
+            });
             
             if (errorResult.isRateLimit) {
                 logger.warn(`Provider "${label}" (${credentialId}) rate limited. Retrying with another provider...`, { 

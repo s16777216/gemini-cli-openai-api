@@ -3,7 +3,7 @@ import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
-  Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus, Square, Server
+  Send, Bot, User, History, LogOut, Menu, Sparkles, Paperclip, Mic, Trash2, Key, Clock, Plus, Square, Server, LayoutDashboard
 } from 'lucide-vue-next'
 import MarkdownMessage from '@/components/MarkdownMessage.vue'
 import {
@@ -273,6 +273,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
           class="w-full justify-start gap-3 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-all">
           <Server class="w-4 h-4 text-primary" />
           上游憑證池
+        </Button>
+
+        <Button @click="router.push('/dashboard')" variant="ghost"
+          class="w-full justify-start gap-3 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-all">
+          <LayoutDashboard class="w-4 h-4 text-primary" />
+          儀表板監控
         </Button>
 
         <div class="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">

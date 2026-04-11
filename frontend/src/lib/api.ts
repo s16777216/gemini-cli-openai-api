@@ -56,5 +56,6 @@ export const deleteUpstream = (id: string) => api.delete<SuccessResponse>(`/admi
  * Model API
  */
 export const getModels = () => api.get<ApiResponse<Model[]>>('/models')
+export const getDashboardStats = () => api.get<ApiResponse<any>>('/admin/stats')
 
 export default api

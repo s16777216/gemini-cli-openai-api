@@ -42,6 +42,7 @@ app.basePath('/v1')
     .get('/admin/upstreams', Implementations.ListUpstreams)
     .post('/admin/upstreams', Implementations.CreateUpstream)
     .delete('/admin/upstreams/:id', Implementations.DeleteUpstream)
+    .get('/admin/stats', Implementations.GetDashboardStats)
     // 標準 OpenAI 相容端點
     .get('/', (c) => c.text('Gemini CLI Proxy is running!'))
     .get('/models', Implementations.ModelList)
