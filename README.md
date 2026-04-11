@@ -1,8 +1,8 @@
 # gemini-cli-openai-api
 
-> 將 [Gemini CLI](https://github.com/google-gemini/gemini-cli) 包裝為 **OpenAI 相容 API** 的輕量代理伺服器。
+> 將 Google Gemini 原生 API 包裝為 **OpenAI 相容 API** 的輕量代理伺服器。
 
-讓任何支援 OpenAI Chat Completions API 的工具（如 OpenCode、Continue、Cursor 等），都能透過本地端的 Gemini CLI 存取 Gemini 模型，無需額外的 API Key 管理。
+讓任何支援 OpenAI Chat Completions API 的工具（如 OpenCode、Continue、Cursor 等），都能透過本代理存取 Gemini 模型，並支援多帳號負載均衡。
 
 ---
 
@@ -30,34 +30,26 @@
         │
         ▼
  gemini-cli-api（Hono 代理伺服器）
-        │  1. 將訊息歷史展平為純文字提示 (Markdown/XML)
-        │  2. 繞過 Shell，直接調用 Gemini CLI 核心 JS (Shell Bypass)
-        │  3. 透過 Stdin 管道傳輸提示詞 (Zero-Disk I/O)
-        │  4. 解析 stream-json 輸出
-        │  5. 轉換為 OpenAI SSE 格式回傳
+        │  1. 驗證管理員或 API Key 權限
+        │  2. 負載均衡取用 OAuth2 憑證池
+        │  3. 轉換為 Gemini 原生 API 格式
+        │  4. 直接透過 HTTPS 呼叫 Google API
+        │  5. 轉換串流回應為 OpenAI SSE 格式
         ▼
-   Gemini CLI（本地端執行）
+   Google Gemini API (REST)
 ```
 
-本代理**不**直接呼叫 Gemini REST API，而是透過 `gemini` CLI 核心腳本執行推理，使用 CLI 的本地 OAuth 認證機制，兼顧隱私與便利性。
+本代理直接呼叫 Gemini REST API，透過內建的 OAuth2 流程進行認證，支援動態管理多個 Google 帳號，兼顧效能與擴充性。
 
 ---
 
 ## 前置需求
 
-| 工具                                                      | 版本需求 | 說明                        |
-| --------------------------------------------------------- | -------- | --------------------------- |
-| [Bun](https://bun.sh)                                     | ≥ 1.0    | 主要執行環境（極速啟動與原生測試） |
-| [Node.js](https://nodejs.org)                             | ≥ 20     | 執行 Gemini CLI 核心腳本所需      |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | 最新版   | 核心推理引擎，需已完成 OAuth 登入  |
-| PowerShell (`pwsh`)                                       | 可選     | 僅部分舊版系統或輔助腳本可能需要    |
-
-### 安裝 Gemini CLI 並登入
-
-```bash
-npm install -g @google/gemini-cli
-gemini  # 首次執行會引導登入
-```
+| 工具                   | 版本需求 | 說明                               |
+| ---------------------- | -------- | ---------------------------------- |
+| [Bun](https://bun.sh)  | ≥ 1.0    | 主要執行環境（極速啟動與原生測試） |
+| [Node.js](https://nodejs.org) | ≥ 20     | 備援執行環境 (可選)                |
+| Google Cloud Project   | N/A      | 需具備 OAuth2 Client ID/Secret     |
 
 ---
 
@@ -103,29 +95,23 @@ npm run start:node # 執行編譯後的版本
 docker-compose up -d --build
 ```
 
-### 3. 初始化 Gemini 登入
+### 3. 初始化授權
 
-由於 `gemini-cli` 使用 OAuth 驗證，你需要**第一次啟動後**完成登入。這會將驗證資訊存入 `./gemini-config` 目錄，未來重新啟動容器時無需再次登入：
-
-```bash
-docker-compose run --rm gemini-proxy gemini
-```
-
-終端機將出現一段 Google 登入網址，請複製至瀏覽器完成授權。授權成功後，你可以按下 `Ctrl+C` 離開。之後服務即可正常運作。
+啟動服務後，請瀏覽管理介面（預設為 `http://localhost:3002/web`），進入「上游管理」頁面，點擊「新增 Google 帳號」完成 OAuth2 授權流程。授權成功後，憑證會自動儲存於 SQLite 資料庫中供負載均衡器使用。
 
 伺服器將執行於 http://localhost:3002。
-所有的 SQLite 資料會被存入 `./data/` 目錄中以確保持久化。
+所有的數據會被存入 `./data/` 目錄中以確保持久化。
 
 ---
 
 ## 效能與優化
 
-本專案經過深度重構，成功將「代理層延遲」降至最低：
+本專案採用效能優先的設計模式：
 
-- **極速啟動 (Shell Bypass)**：直接調用 JS 進入點，避開 Shell Profile 載入。進程啟動開銷從 **~1100ms** 驟降至 **~20ms** (-98%)。
-- **零磁碟 I/O**：全面改用 `stdin` 管道傳輸提示詞，移除暫存檔讀寫成本。
-- **超量輸入支援**：得益於管道傳輸，輸入長度不再受限於作業系統的指令字串限制，僅受模型上下文視窗（1M+ tokens）限制。
-- **抑制更新檢查**：自動注入環境變數，禁止啟動時的自動更新檢測，確保回應穩定。
+- **直接 API 代理**：捨棄邊緣工具依賴，直接與 Google 端點溝通，最小化中間層延遲。
+- **異步串流處理**：完美支援 SSE 串流轉換，前端可即時呈現打字機效果。
+- **負載均衡**：支援多組 OAuth2 憑證輪詢，避免單一帳號頻率限制 (429 Rate Limit)。
+- **持久化 Session**：整合 SQLite 管理對話歷史，支援 Session 恢復與長對話記憶。
 
 ## API 端點
 

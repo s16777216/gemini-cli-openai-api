@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,8 @@ const newType = ref<'oauth2' | 'api_key'>('oauth2')
 // 刪除確認狀態
 const isDeleteDialogOpen = ref(false)
 const idToDelete = ref<string | null>(null)
+const now = ref(Date.now())
+let timer: any = null
 
 const fetchUpstreams = async () => {
   isLoading.value = true
@@ -108,7 +110,20 @@ const formatDate = (ts: number) => {
 
 onMounted(() => {
   if (props.isOpen) fetchUpstreams()
+  timer = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
 })
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
+const getRemainingSeconds = (recoveryAt?: number) => {
+  if (!recoveryAt) return 0
+  const diff = Math.floor((recoveryAt - now.value) / 1000)
+  return diff > 0 ? diff : 0
+}
 
 watch(() => props.isOpen, (newVal) => {
   if (newVal) fetchUpstreams()
@@ -223,7 +238,12 @@ watch(() => props.isOpen, (newVal) => {
                       </span>
                     </div>
                     <div class="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
-                      <span>狀態：{{ item.status }}</span>
+                      <span :class="{ 'text-destructive font-medium': item.status === 'rate_limited', 'text-green-500 font-medium': item.status === 'active' }">
+                        狀態：{{ item.status === 'rate_limited' ? '限流中' : (item.status === 'active' ? '運作中' : '失效') }}
+                      </span>
+                      <span v-if="item.status === 'rate_limited' && item.recoveryAt" class="text-destructive animate-pulse font-bold">
+                        (預計 {{ getRemainingSeconds(item.recoveryAt) }}s 後恢復)
+                      </span>
                       <span v-if="item.lastUsedAt">上次使用：{{ formatDate(item.lastUsedAt) }}</span>
                     </div>
                   </div>

@@ -37,6 +37,7 @@ export interface UpstreamCredential {
   status: 'active' | 'rate_limited' | 'invalid';
   weight: number;
   lastUsedAt?: number;
+  recoveryAt?: number;
   createdAt: number;
 }
 

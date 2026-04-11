@@ -68,9 +68,17 @@ export class ApiKeyRepository {
                 status TEXT,
                 weight INTEGER DEFAULT 1,
                 lastUsedAt INTEGER,
+                recoveryAt INTEGER,
                 createdAt INTEGER
             )
         `);
+
+        // Migration: Add recoveryAt column if doesn't exist (for existing DBs)
+        try {
+            this.db.run("ALTER TABLE upstream_credentials ADD COLUMN recoveryAt INTEGER");
+        } catch (e) {
+            // Column might already exist, which is fine
+        }
     }
 
     public findAll(): ApiKey[] {

@@ -20,7 +20,7 @@ import { Chat } from '@ai-sdk/vue'
 import { OpenAIChatTransport } from '@/lib/openai-transport'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
-import { getSessions, getSession, deleteSession as apiDeleteSession, getModels } from '@/lib/api'
+import { getSessions, getSession, deleteSession as apiDeleteSession, deleteAllSessions, getModels } from '@/lib/api'
 import type { Session, Model } from '@/types/api'
 import ApiKeyManager from '@/components/ApiKeyManager.vue'
 import UpstreamManager from '@/components/UpstreamManager.vue'
@@ -39,11 +39,12 @@ const isKeyModalOpen = ref(false)
 const isUpstreamModalOpen = ref(false)
 const isHistoryLoading = ref(false)
 const allModels = ref<Model[]>([])
-const selectedModel = ref('gemini-2.5-flash')
+const selectedModel = ref('gemini-3-flash-preview')
 
 // 刪除確認狀態
 const isDeleteDialogOpen = ref(false)
 const sessionIdToDelete = ref<string | null>(null)
+const isDeleteAllDialogOpen = ref(false)
 
 // Vercel AI SDK Chat instance
 const chat = new Chat({
@@ -55,6 +56,11 @@ const chat = new Chat({
     body: {
       model: selectedModel.value,
       sessionId: currentSessionId.value
+    },
+    onSessionId: (id: string) => {
+      if (!currentSessionId.value) {
+        currentSessionId.value = id
+      }
     },
     onFinish: () => {
       // 串流結束後重新獲取列表，以獲取自動產生的標題
@@ -129,6 +135,20 @@ const confirmDeleteChat = async () => {
   } finally {
     isDeleteDialogOpen.value = false
     sessionIdToDelete.value = null
+  }
+}
+
+const confirmDeleteAllSessions = async () => {
+  try {
+    await deleteAllSessions()
+    startNewChat()
+    await fetchSessions()
+    toast.success('所有對話紀錄已成功清空')
+  } catch (err) {
+    console.error('Failed to delete all sessions:', err)
+    toast.error('清空失敗，請稍後再試')
+  } finally {
+    isDeleteAllDialogOpen.value = false
   }
 }
 
@@ -215,7 +235,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
         </Button>
 
         <div class="px-2 pb-2">
-          <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-1">最近對話</p>
+          <div class="flex items-center justify-between mb-3 px-1">
+            <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">最近對話</p>
+            <Button v-if="sessions.length > 0" variant="ghost" size="icon" @click="isDeleteAllDialogOpen = true"
+              class="h-6 w-6 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-md transition-all">
+              <Trash2 class="w-3.5 h-3.5" />
+            </Button>
+          </div>
           <div v-if="sessions.length === 0" class="py-10 text-center space-y-2 opacity-40">
             <Clock class="w-8 h-8 mx-auto" />
             <p class="text-xs">尚無歷史對話</p>
@@ -418,9 +444,11 @@ const handleKeyDown = (e: KeyboardEvent) => {
     <ApiKeyManager :isOpen="isKeyModalOpen" @close="isKeyModalOpen = false" />
     <UpstreamManager :isOpen="isUpstreamModalOpen" @close="isUpstreamModalOpen = false" />
 
-    <!-- 刪除確認彈窗 -->
     <RadixAlertDialog v-model:open="isDeleteDialogOpen" title="確認要刪除此對話嗎？" description="此操作將永久刪除該對話紀錄及其所有訊息內容，且無法復原。"
-      actionText="確認刪除" variant="destructive" @action="confirmDeleteChat" />
+    actionText="確認刪除" variant="destructive" @action="confirmDeleteChat" />
+
+    <RadixAlertDialog v-model:open="isDeleteAllDialogOpen" title="確定要清空所有對話紀錄？" description="這將會永久刪除您所有的歷史對話與訊息，此操作無法復原。"
+      actionText="全部清空" variant="destructive" @action="confirmDeleteAllSessions" />
   </div>
 </template>
 

@@ -23,3 +23,9 @@ export const DeleteSession = async (c: Context) => {
     repo.delete(id);
     return c.json({ success: true });
 };
+
+export const DeleteAllSessions = async (c: Context) => {
+    const repo = SessionRepository.getInstance();
+    repo.deleteAll();
+    return c.json({ success: true });
+};

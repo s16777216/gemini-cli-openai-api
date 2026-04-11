@@ -29,20 +29,26 @@ export class LoadBalancerService {
             return null;
         }
 
-        // POC: Random selection
-        const randomIndex = Math.floor(Math.random() * activeCreds.length);
-        const selected = activeCreds[randomIndex];
+        // 策略更新：選擇最久未使用的憑證 (Least Recently Used / Round Robin)
+        // 因為 findActive() 已按 lastUsedAt ASC 排序，第 0 個就是最久沒被用到的
+        const selected = activeCreds[0];
 
         if (!selected) return null;
 
         try {
-            const config = JSON.parse(selected.config) as OAuth2Config;
-            const provider = new GeminiApiProvider(config);
+            let provider: GeminiApiProvider;
+            
+            if (selected.type === 'api_key') {
+                provider = new GeminiApiProvider(selected.config, 'api_key', selected.label);
+            } else {
+                const config = JSON.parse(selected.config) as OAuth2Config;
+                provider = new GeminiApiProvider(config, 'oauth2', selected.label);
+            }
             
             // Update last used time asynchronously
             this.upstreamRepo.updateLastUsed(selected.id);
             
-            return { provider, credentialId: selected.id };
+            return { provider, credentialId: selected.id, label: selected.label };
         } catch (e) {
             logger.error("Failed to initialize provider from config", { id: selected.id, error: String(e) });
             // If config is broken, mark as invalid?
@@ -54,14 +60,15 @@ export class LoadBalancerService {
     /**
      * Mark a credential as rate limited.
      */
-    public markRateLimited(id: string): void {
-        logger.warn("Marking upstream credential as rate limited", { id });
-        this.upstreamRepo.updateStatus(id, 'rate_limited');
+    public markRateLimited(id: string, retryAfterSeconds: number = 60): void {
+        const recoveryAt = Date.now() + (retryAfterSeconds * 1000);
+        logger.warn("Marking upstream credential as rate limited", { id, retryAfterSeconds, recoveryAt });
+        this.upstreamRepo.updateStatus(id, 'rate_limited', recoveryAt);
         
-        // Auto-recovery after 1 minute (simplistic POC logic)
+        // Auto-recovery after specified seconds
         setTimeout(() => {
             logger.info("Auto-recovering upstream credential from rate limit", { id });
-            this.upstreamRepo.updateStatus(id, 'active');
-        }, 60000);
+            this.upstreamRepo.updateStatus(id, 'active', null);
+        }, retryAfterSeconds * 1000);
     }
 }

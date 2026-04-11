@@ -2,8 +2,16 @@ import type { OAuth2Config } from "../../schemas/upstream";
 import { GoogleAuthManager } from "../../utils/googleAuth";
 import { logger } from "../../utils/logger";
 
-const CODE_ASSIST_ENDPOINT = "https://cloudaicompanion.googleapis.com";
-const CODE_ASSIST_API_VERSION = "v1beta";
+const CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com";
+const CODE_ASSIST_API_VERSION = "v1internal";
+
+const DEFAULT_SAFETY_SETTINGS = [
+    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+];
 
 export interface GeminiResponsePart {
   text?: string;
@@ -30,35 +38,129 @@ export interface GeminiResponseChunk {
 }
 
 export class GeminiApiProvider {
-    private config: OAuth2Config;
+    private config?: OAuth2Config;
+    private apiKey?: string;
+    private label: string;
+    private authType: 'oauth2' | 'api_key';
     private accessToken: string | null = null;
     private expiryDate: number | null = null;
 
-    constructor(config: OAuth2Config) {
-        this.config = config;
-        this.accessToken = config.access_token || null;
-        this.expiryDate = config.expiry_date || null;
+    constructor(credential: string | OAuth2Config, type: 'oauth2' | 'api_key' = 'oauth2', label: string = 'Unknown') {
+        this.authType = type;
+        this.label = label;
+        if (type === 'oauth2') {
+            this.config = credential as OAuth2Config;
+            this.accessToken = this.config.access_token || null;
+            this.expiryDate = this.config.expiry_date || null;
+        } else {
+            this.apiKey = credential as string;
+        }
     }
 
     private async ensureAuth(): Promise<string> {
+        if (!this.config) throw new Error("OAuth2 Config is missing");
         if (!this.accessToken || GoogleAuthManager.isExpired(this.expiryDate ?? 0)) {
             const tokenData = await GoogleAuthManager.refreshAccessToken(this.config);
             this.accessToken = tokenData.access_token;
             this.expiryDate = Date.now() + tokenData.expires_in * 1000;
-            // Note: In a real implementation, we should update the DB with these new tokens
         }
         return this.accessToken;
     }
 
     /**
-     * Executes a chat completion request via the Google Code Assist API.
+     * Discovers the Google Cloud project ID automatically if not provided.
      */
-    public async streamGenerateContent(modelId: string, contents: any[], generationConfig: any = {}): Promise<ReadableStream> {
-        const token = await this.ensureAuth();
-        const projectId = this.config.project_id || "unused-project-id";
+    private async discoverProjectId(token: string): Promise<string> {
+        if (!this.config) return "unused-project-id";
+        
+        if (this.config.project_id && this.config.project_id !== "unused-project-id") {
+            return this.config.project_id;
+        }
 
+        logger.info("Discovering Project ID for Gemini...");
+        const url = `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:loadCodeAssist`;
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    metadata: { ideType: "ANTIGRAVITY" }
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json() as any;
+                const discoveredId = data.cloudaicompanionProject;
+                if (discoveredId) {
+                    logger.info("Directly discovered Gemini Project ID", { discoveredId });
+                    this.config.project_id = discoveredId; // Cache it in memory for this session
+                    return discoveredId;
+                }
+            }
+            logger.warn("Project discovery returned no ID or failed", { status: response.status });
+        } catch (e) {
+            logger.error("Error during project discovery", { error: (e as any).message });
+        }
+
+        return "unused-project-id"; // Fallback
+    }
+
+    public async streamGenerateContent(modelId: string, contents: any[], generationConfig: any = {}): Promise<ReadableStream> {
+        if (this.authType === 'api_key') {
+            return this.streamGenerateContentWithApiKey(modelId, contents, generationConfig);
+        } else {
+            return this.streamGenerateContentWithOAuth2(modelId, contents, generationConfig);
+        }
+    }
+
+    private async streamGenerateContentWithApiKey(modelId: string, contents: any[], generationConfig: any = {}): Promise<ReadableStream> {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+        
+        const payload = {
+            contents,
+            generationConfig: {
+                temperature: generationConfig.temperature,
+                topP: generationConfig.topP || generationConfig.top_p,
+                maxOutputTokens: generationConfig.maxOutputTokens || generationConfig.max_tokens,
+                stopSequences: generationConfig.stopSequences || generationConfig.stop
+            },
+            safetySettings: DEFAULT_SAFETY_SETTINGS
+        };
+
+        logger.info("Sending request to Gemini API (API Key Channel)", { label: this.label, modelId });
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            logger.error("Gemini API Key request failed", { status: response.status, error: errorText });
+            throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+        }
+
+        if (!response.body) throw new Error("Gemini API response has no body");
+        return response.body;
+    }
+
+    /**
+     * Executes a chat completion request via the Google Code Assist (IDE) API.
+     */
+    private async streamGenerateContentWithOAuth2(modelId: string, contents: any[], generationConfig: any = {}): Promise<ReadableStream> {
+        const token = await this.ensureAuth();
+        const projectId = await this.discoverProjectId(token);
+
+        // IDE 通道專用 URL (不帶 models/ 模型路徑)
         const url = `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:streamGenerateContent?alt=sse`;
         
+        // IDE 通道專用雙層封裝格式
         const payload = {
             model: modelId,
             project: projectId,
@@ -66,21 +168,21 @@ export class GeminiApiProvider {
                 contents,
                 generationConfig: {
                     temperature: generationConfig.temperature,
-                    topP: generationConfig.top_p,
-                    maxOutputTokens: generationConfig.max_tokens,
-                    stopSequences: generationConfig.stop,
-                    ...generationConfig
-                }
+                    topP: generationConfig.topP || generationConfig.top_p,
+                    maxOutputTokens: generationConfig.maxOutputTokens || generationConfig.max_tokens,
+                    stopSequences: generationConfig.stopSequences || generationConfig.stop
+                },
+                safetySettings: DEFAULT_SAFETY_SETTINGS
             }
         };
 
-        logger.info("Sending request to Gemini API", { modelId, projectId });
+        logger.info("Sending request to Gemini API (IDE Channel)", { label: this.label, modelId, projectId });
 
         const response = await fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
+                "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify(payload)
         });

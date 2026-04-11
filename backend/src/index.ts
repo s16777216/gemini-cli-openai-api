@@ -48,6 +48,7 @@ app.basePath('/v1')
     .post('/chat/completions', Implementations.ChatCompletions)
     // 恢復：Session 歷史管理
     .get('/sessions', Implementations.ListSessions)
+    .delete('/sessions', Implementations.DeleteAllSessions)
     .get('/sessions/:id', Implementations.GetSessionHistory)
     .delete('/sessions/:id', Implementations.DeleteSession);
 

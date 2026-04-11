@@ -12,8 +12,23 @@ import { HttpChatTransport, type UIMessageChunk, type UIMessage } from 'ai';
  */
 export class OpenAIChatTransport<UI_MESSAGE extends UIMessage> extends HttpChatTransport<UI_MESSAGE> {
   constructor(options: any) {
+    const { onSessionId, ...restOptions } = options;
     super({
-      ...options,
+      ...restOptions,
+      /**
+       * 注入自定義 fetch 以攔截 Response Headers
+       */
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const response = await fetch(input, init);
+        
+        // 嘗試從 Header 擷取 Session ID
+        const sessionId = response.headers.get('x-session-id');
+        if (sessionId && onSessionId) {
+          onSessionId(sessionId);
+        }
+        
+        return response;
+      },
       /**
        * 覆寫請求建構邏輯：
        * 將 AI SDK 的 parts 格式轉換回標準 OpenAI 格式

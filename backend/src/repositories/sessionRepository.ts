@@ -69,4 +69,9 @@ export class SessionRepository {
         this.db.run("DELETE FROM sessions WHERE id = ?", [id]);
         // 由於外鍵 CASCADE，訊息會自動刪除
     }
+    
+    public deleteAll(): void {
+        this.db.run("DELETE FROM sessions");
+        // 由於外鍵 CASCADE，所有訊息也會被清空
+    }
 }

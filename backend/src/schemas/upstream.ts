@@ -10,6 +10,7 @@ export const UpstreamCredentialSchema = z.object({
   status: z.enum(['active', 'rate_limited', 'invalid']),
   weight: z.number().default(1),
   lastUsedAt: z.number().optional(),
+  recoveryAt: z.number().optional(),
   createdAt: z.number(),
 });
 

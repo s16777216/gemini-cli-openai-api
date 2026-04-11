@@ -3,7 +3,7 @@ import ChatCompletions from "./chat";
 import ModelList from "./modelList";
 import { ListKeys, CreateKey, RevokeKey } from "./keys";
 import { Login } from "./admin";
-import { ListSessions, GetSessionHistory, DeleteSession } from "./sessions";
+import { ListSessions, GetSessionHistory, DeleteSession, DeleteAllSessions } from "./sessions";
 import { ListUpstreams, CreateUpstream, DeleteUpstream } from "./upstream";
 import { OAuthLogin, OAuthCallback } from "./auth";
 
@@ -17,6 +17,7 @@ interface Implementations {
     ListSessions: (c: Context) => Promise<Response>;
     GetSessionHistory: (c: Context) => Promise<Response>;
     DeleteSession: (c: Context) => Promise<Response>;
+    DeleteAllSessions: (c: Context) => Promise<Response>;
     ListUpstreams: (c: Context) => Promise<Response>;
     CreateUpstream: (c: Context) => Promise<Response>;
     DeleteUpstream: (c: Context) => Promise<Response>;
@@ -32,6 +33,7 @@ const Implementations: Implementations = {
     RevokeKey,
     Login,
     ListSessions,
+    DeleteAllSessions,
     GetSessionHistory,
     DeleteSession,
     ListUpstreams,

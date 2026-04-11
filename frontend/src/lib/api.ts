@@ -36,6 +36,7 @@ api.interceptors.response.use((response) => response, (error) => {
 export const getSessions = () => api.get<ApiResponse<Session[]>>('/sessions')
 export const getSession = (id: string) => api.get<ApiResponse<Session>>(`/sessions/${id}`)
 export const deleteSession = (id: string) => api.delete<SuccessResponse>(`/sessions/${id}`)
+export const deleteAllSessions = () => api.delete<SuccessResponse>('/sessions')
 
 /**
  * API Key Management API

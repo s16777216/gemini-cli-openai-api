@@ -31,10 +31,10 @@ export class UpstreamRepository {
     public add(cred: UpstreamCredential): boolean {
         try {
             const query = this.db.query(`
-                INSERT INTO upstream_credentials (id, type, label, config, status, weight, lastUsedAt, createdAt)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                INSERT INTO upstream_credentials (id, type, label, config, status, weight, lastUsedAt, recoveryAt, createdAt)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             `);
-            query.run(cred.id, cred.type, cred.label, cred.config, cred.status, cred.weight, cred.lastUsedAt ?? null, cred.createdAt);
+            query.run(cred.id, cred.type, cred.label, cred.config, cred.status, cred.weight, cred.lastUsedAt ?? null, cred.recoveryAt ?? null, cred.createdAt);
             return true;
         } catch (e) {
             logger.error("Failed to add upstream credential to SQLite", { error: String(e) });
@@ -42,10 +42,10 @@ export class UpstreamRepository {
         }
     }
 
-    public updateStatus(id: string, status: string): boolean {
+    public updateStatus(id: string, status: string, recoveryAt: number | null = null): boolean {
         try {
-            const query = this.db.query("UPDATE upstream_credentials SET status = ?1 WHERE id = ?2");
-            const result = query.run(status, id);
+            const query = this.db.query("UPDATE upstream_credentials SET status = ?1, recoveryAt = ?2 WHERE id = ?3");
+            const result = query.run(status, recoveryAt, id);
             return result.changes > 0;
         } catch (e) {
             logger.error("Failed to update upstream status in SQLite", { error: String(e) });

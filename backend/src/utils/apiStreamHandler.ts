@@ -28,7 +28,7 @@ export async function handleApiStream(
 
             for (const line of lines) {
                 const trimmed = line.trim();
-                if (!trimmed || !trimmed.startsWith("data: ")) continue;
+                if (!trimmed || !trimmed.startsWith("data:")) continue;
 
                 if (firstByte) {
                     const ttfb = (performance.now() - startTime).toFixed(2);
@@ -36,12 +36,14 @@ export async function handleApiStream(
                     firstByte = false;
                 }
 
-                const data = trimmed.substring(6);
+                const data = trimmed.substring(trimmed.indexOf(":") + 1).trim();
                 if (data === "[DONE]") continue;
 
                 try {
                     const json = JSON.parse(data);
-                    const parts = json.response?.candidates?.[0]?.content?.parts;
+                    // 相容性處理：IDE Channel 有 response 包裹，Public API 則直接是 candidates
+                    const candidates = json.response?.candidates || json.candidates;
+                    const parts = candidates?.[0]?.content?.parts;
                     
                     if (parts) {
                         for (const part of parts) {
