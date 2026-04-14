@@ -10,12 +10,15 @@ services:
       - "3002:3002"
     volumes:
       # 掛載本機的 ./backend/data 目錄以持久化儲存 SQLite 資料庫
-      - ./backend/data:/app/data
-      # 掛載登入所需的設定檔。gemini-cli 預設儲存於 ~/.gemini 目錄
-      # 將其掛載到本機，使得重新建立 container 不會遺失登入狀態
+      # 校正：Container 內預設工作目錄為 /app/backend
+      - ./backend/data:/app/backend/data
+      # 掛載登入所需的設定檔 (保留作為傳統驗證備援)
       - ./gemini-config:/root/.gemini
     environment:
       - PORT=3002
       - DATABASE_PATH=./data/api_keys.db
+      - JWT_SECRET=your-secure-jwt-secret-here
+      - ROOT_USER=admin
+      - ROOT_PASSWORD=admin
       - LOG_LEVEL=info
     restart: unless-stopped

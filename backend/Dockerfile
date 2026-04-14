@@ -2,7 +2,7 @@
 FROM oven/bun:1-debian AS frontend-build
 WORKDIR /app/frontend
 
-# 複製相依性描述檔以供快取
+# 複製相依性描述檔
 COPY frontend/package.json frontend/bun.lock* ./
 RUN bun install
 
@@ -10,38 +10,33 @@ RUN bun install
 COPY frontend .
 RUN bun run build
 
-# 第二階段：執行環境
+# 第二階段：執行環境 (純 Bun 環境)
 FROM oven/bun:1-debian
-
-# 更新系統並安裝 nodejs 與 npm (Gemini CLI 依賴)
-RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
-
-# 全域安裝 gemini-cli
-RUN npm install -g @google/gemini-cli
-
 WORKDIR /app
 
-# 複製後端相依性檔案
+# 僅複製後端相依性檔案以供快取
 COPY backend/package.json backend/bun.lock* ./backend/
-WORKDIR /app/backend
-RUN bun install --frozen-lockfile || bun install
+RUN cd backend && (bun install --frozen-lockfile || bun install)
 
 # 複製後端源碼
-WORKDIR /app
 COPY backend ./backend/
 
-# 從編譯階段複製前端產物到正確的位置 (供 Hono serveStatic 使用)
+# 從編譯階段複製前端產物
+# 注意：後端 src/index.ts 的 serveStatic 預設尋找 ../frontend/dist
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# 切換到執行目錄
+# 確保資料持久化目錄存在
+RUN mkdir -p /app/backend/data
+
+# 設定執行目錄
 WORKDIR /app/backend
 
-# 曝露預設通訊埠
+# 曝露通訊埠
 EXPOSE 3002
 
-# 設定環境變數 (可由 docker-compose 覆蓋)
+# 設定環境變數
 ENV PORT=3002
 ENV NODE_ENV=production
 
-# 啟動應用程式
+# 啟動應用程式 (直接使用 Bun 執行)
 CMD ["bun", "run", "start"]
